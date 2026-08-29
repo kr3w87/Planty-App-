@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#eee5d7">
+<title>Planty – Deine Pflanzen</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div>
+      <div class="brand"><span class="leaf">⌁</span> PLANTY</div>
+      <div class="tagline">Deine Pflanzen. Deine Pflege.</div>
+    </div>
+    <button class="icon-btn" id="notifyBtn" aria-label="Benachrichtigungen">♧</button>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div>
+        <p class="eyebrow">DEIN GRÜNES ZUHAUSE</p>
+        <h1>Guten Morgen<span> 🌿</span></h1>
+        <p class="muted">Heute gibt es ein bisschen Pflanzenliebe.</p>
+      </div>
+      <div class="hero-stat"><strong id="plantCount">0</strong><span>Pflanzen</span></div>
+    </section>
+
+    <section class="overview-card">
+      <div><span class="mini-icon">💧</span><div><strong id="waterCount">0</strong><span>Heute gießen</span></div></div>
+      <div><span class="mini-icon">🌱</span><div><strong id="fertCount">0</strong><span>Bald düngen</span></div></div>
+      <div><span class="mini-icon">♡</span><div><strong id="healthCount">0</strong><span>Probleme</span></div></div>
+    </section>
+
+    <section>
+      <div class="section-head"><h2>Heute zu tun</h2><button class="text-btn" id="showAllBtn">Alle</button></div>
+      <div id="tasks" class="tasks"></div>
+    </section>
+
+    <section>
+      <div class="section-head"><h2>Deine Pflanzen</h2><button class="text-btn" id="addBtn">＋ Hinzufügen</button></div>
+      <div id="plantsGrid" class="plants-grid"></div>
+    </section>
+  </main>
+
+  <nav class="bottom-nav">
+    <button class="nav-item active" data-tab="home">⌂<span>Übersicht</span></button>
+    <button class="nav-item" data-tab="plants">♧<span>Pflanzen</span></button>
+    <button class="add-main" id="addMain">＋</button>
+    <button class="nav-item" data-tab="growth">▧<span>Wachstum</span></button>
+    <button class="nav-item" data-tab="care">♡<span>Pflege</span></button>
+  </nav>
+</div>
+
+<div class="modal hidden" id="plantModal">
+  <div class="modal-card">
+    <div class="modal-head"><h2>Neue Pflanze</h2><button class="close" id="closeModal">×</button></div>
+    <form id="plantForm">
+      <label>Foto
+        <div class="photo-upload" id="photoPreview">📷<span>Foto auswählen</span></div>
+        <input type="file" id="photo" accept="image/*" hidden>
+      </label>
+      <label>Name<input required id="name" placeholder="z. B. Monstera"></label>
+      <label>Pflanzenart<input id="species" placeholder="z. B. Monstera deliciosa"></label>
+      <div class="two">
+        <label>Standort<input id="location" placeholder="Wohnzimmer"></label>
+        <label>Licht
+          <select id="light"><option>Hell, indirekt</option><option>Hell</option><option>Halbschatten</option><option>Schatten</option></select>
+        </label>
+      </div>
+      <div class="two">
+        <label>Gießen alle <input type="number" min="1" value="7" id="waterInterval"> Tage</label>
+        <label>Düngen alle <input type="number" min="1" value="30" id="fertInterval"> Tage</label>
+      </div>
+      <label>Notizen<textarea id="notes" placeholder="Alles, was du dir merken möchtest …"></textarea></label>
+      <button class="primary" type="submit">Pflanze speichern</button>
+    </form>
+  </div>
+</div>
+
+<div class="modal hidden" id="detailModal">
+  <div class="modal-card">
+    <div class="modal-head"><h2 id="detailName"></h2><button class="close" id="closeDetail">×</button></div>
+    <div id="detailBody"></div>
+  </div>
+</div>
+<script src="app.js"></script>
+</body>
+</html>
