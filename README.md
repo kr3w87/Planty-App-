@@ -1,12 +1,15 @@
-# Planty V1
+# Planty V2
 
-Eine mobile-first Pflanzenpflege-Web-App ohne Backend.
+Enthält Registrierung/Login, Supabase-Cloudspeicherung, RLS-kompatible Pflanzenverwaltung, Gieß- und Düngeintervalle und das Planty Natur/Edel-Design.
 
-## Start
-Einfach `index.html` im Browser öffnen.
+## GitHub Pages
+Diese 4 Dateien ins Repository hochladen und V1 ersetzen:
+- index.html
+- styles.css
+- app.js
+- README.md
 
-## Netlify
-Den gesamten Ordner `planty-v1` bzw. den entpackten Inhalt per Drag & Drop in Netlify deployen.
+In Supabase unter Authentication → URL Configuration deine GitHub-Pages-Adresse als Site URL/Redirect URL eintragen, z. B. https://DEINNAME.github.io/planty/
 
-## Hinweis
-Die Pflanzen werden in `localStorage` des jeweiligen Browsers gespeichert. Fotos werden ebenfalls lokal gespeichert. Für geräteübergreifende Synchronisation und echte Push-Nachrichten wird später ein Backend benötigt.
+Fotos kommen in V2.1 über Supabase Storage.
+Der Publishable Key darf im Browser stehen. Niemals Secret-/Service-Role-Keys veröffentlichen.
