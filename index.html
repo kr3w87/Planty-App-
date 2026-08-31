@@ -1,6 +1,30 @@
-<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#eee5d7"><title>Planty V2</title><link rel="stylesheet" href="styles.css"></head><body>
-<div id="auth" class="auth"><div class="authbox"><div class="brand">⌁ PLANTY</div><p>Deine Pflanzen. Deine Pflege.</p><h1 id="authTitle">Willkommen zurück</h1><form id="authForm"><input id="email" type="email" placeholder="E-Mail" required><input id="password" type="password" placeholder="Passwort" minlength="6" required><button class="primary" id="authBtn">Anmelden</button></form><button class="link" id="mode">Noch kein Konto? Registrieren</button><small id="authMsg"></small></div></div>
-<div id="app" class="hidden"><header><div><b>⌁ PLANTY</b><small>Deine Pflanzen. Deine Pflege.</small></div><button id="logout">↪</button></header><main><section class="hero"><div><small>DEIN GRÜNES ZUHAUSE</small><h1>Deine Pflanzen 🌿</h1></div><strong id="count">0</strong></section><section class="stats"><div>💧 <b id="water">0</b><small>Heute gießen</small></div><div>🌱 <b id="fert">0</b><small>Bald düngen</small></div><div>♡ <b id="issues">0</b><small>Probleme</small></div></section><div class="section"><h2>Heute zu tun</h2><div id="tasks"></div></div><div class="section"><div class="secthead"><h2>Deine Pflanzen</h2><button class="link" id="add">＋ Hinzufügen</button></div><div id="plants" class="grid"></div></div></main></div>
-<div id="modal" class="modal hidden"><div class="card"><div class="secthead"><h2>Neue Pflanze</h2><button id="close">×</button></div><form id="plantForm"><input id="name" placeholder="Name, z. B. Monstera" required><input id="species" placeholder="Pflanzenart"><input id="location" placeholder="Standort, z. B. Wohnzimmer"><select id="light"><option>Hell, indirekt</option><option>Hell</option><option>Halbschatten</option><option>Schatten</option></select><label>Gießen alle <input id="wi" type="number" min="1" value="7"> Tage</label><label>Düngen alle <input id="fi" type="number" min="1" value="30"> Tage</label><textarea id="notes" placeholder="Notizen"></textarea><button class="primary">Pflanze speichern</button></form></div></div>
-<div id="detail" class="modal hidden"><div class="card"><div class="secthead"><h2 id="dn"></h2><button id="dc">×</button></div><div id="db"></div></div></div>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="app.js"></script></body></html>
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Planty V2.1</title><link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="auth"><div class="box">
+<div class="brand">⌁ PLANTY</div><p>Deine Pflanzen. Deine Pflege.</p>
+<h1 id="title">Willkommen zurück</h1>
+<form id="authForm"><input id="email" type="email" placeholder="E-Mail" required>
+<input id="password" type="password" placeholder="Passwort" minlength="6" required>
+<button id="authBtn">ANMELDEN</button></form>
+<button class="link" id="mode">Noch kein Konto? Registrieren</button><small id="authMsg"></small>
+</div></div>
+<div id="app" class="hidden">
+<header><b>⌁ PLANTY</b><button id="logout">↪</button></header>
+<main><p class="eyebrow">DEIN GRÜNES ZUHAUSE</p><div class="titleRow"><h1>Deine Pflanzen 🌿</h1><strong id="count">0</strong></div>
+<div class="stats"><div>💧<b id="water">0</b><small>Heute gießen</small></div><div>🌱<b id="fert">0</b><small>Bald düngen</small></div><div>🩺<b id="issues">0</b><small>Beobachten</small></div></div>
+<h2>Heute zu tun</h2><div id="tasks"></div>
+<div class="secthead"><h2>Deine Pflanzen</h2><button class="link" id="add">＋ Hinzufügen</button></div>
+<div id="plants" class="grid"></div></main></div>
+<div id="modal" class="modal hidden"><div class="sheet"><div class="secthead"><h2>Neue Pflanze</h2><button id="close">×</button></div>
+<form id="plantForm"><input id="name" placeholder="Name, z. B. Monstera" required><input id="species" placeholder="Pflanzenart"><input id="location" placeholder="Standort">
+<select id="light"><option>Hell, indirekt</option><option>Hell</option><option>Halbschatten</option><option>Schatten</option></select>
+<label>Gießen alle <input id="wi" type="number" min="1" value="7"> Tage</label>
+<label>Düngen alle <input id="fi" type="number" min="1" value="30"> Tage</label>
+<textarea id="notes" placeholder="Notizen"></textarea><button class="primary">Pflanze speichern</button></form></div></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="app.js"></script>
+</body></html>
