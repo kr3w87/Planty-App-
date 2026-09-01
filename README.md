@@ -1,2 +1,4 @@
-# Planty V2.1
-Für GitHub Pages + Supabase. Ersetze im Repository `index.html`, `styles.css` und `app.js` durch diese Dateien. Das V2.1-SQL muss bereits in Supabase ausgeführt worden sein.
+# Planty V2.2
+Neue Pflanzen-Auswahl mit hinterlegten Pflegewerten für 10 häufige Zimmerpflanzen.
+Die Auswahl wird beim Anlegen verwendet; Name kann optional selbst vergeben werden.
+Zusätzlich: Foto, Standort, Lichtbedarf, Gießen, Düngen.
