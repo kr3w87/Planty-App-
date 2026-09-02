@@ -1,4 +1,12 @@
-# Planty V2.2
-Neue Pflanzen-Auswahl mit hinterlegten Pflegewerten für 10 häufige Zimmerpflanzen.
-Die Auswahl wird beim Anlegen verwendet; Name kann optional selbst vergeben werden.
-Zusätzlich: Foto, Standort, Lichtbedarf, Gießen, Düngen.
+# Planty V2.3 – große Pflanzen-Datenbank
+
+Enthält 91 Pflanzen mit:
+- deutschem Namen
+- botanischem Namen
+- Lichtbedarf
+- Start-Gießintervall
+- Start-Düngeintervall
+
+`plant-database.js` ist absichtlich separat gehalten. Dadurch kann die bestehende Planty-App die Datenbank übernehmen, ohne die Supabase-Struktur zu verändern.
+
+Hinweis: Pflegeintervalle sind Startwerte und sollten je nach Standort, Topf, Substrat, Jahreszeit und Pflanze angepasst werden.
