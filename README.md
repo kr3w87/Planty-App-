@@ -1,12 +1,4 @@
-# Planty V2.3 – große Pflanzen-Datenbank
-
-Enthält 91 Pflanzen mit:
-- deutschem Namen
-- botanischem Namen
-- Lichtbedarf
-- Start-Gießintervall
-- Start-Düngeintervall
-
-`plant-database.js` ist absichtlich separat gehalten. Dadurch kann die bestehende Planty-App die Datenbank übernehmen, ohne die Supabase-Struktur zu verändern.
-
-Hinweis: Pflegeintervalle sind Startwerte und sollten je nach Standort, Topf, Substrat, Jahreszeit und Pflanze angepasst werden.
+# Planty V2.3 – Suche
+Die mitgelieferte Pflanzendatenbank ist in die App eingebunden.
+Suche nach deutschem oder botanischem Namen, z. B. Monstera, Palme oder Ficus.
+Nach Auswahl werden Licht, Gießintervall und Düngeintervall automatisch übernommen.
