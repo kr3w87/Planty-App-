@@ -68,3 +68,148 @@ $("logout").onclick=()=>db.auth.signOut();db.auth.onAuthStateChange((_,s)=>s?loa
   }
   search.addEventListener("input",render);
 })();
+
+
+
+/* Planty V2.4 – Verbesserte Pflanzenübersicht */
+(function () {
+  const esc = (v) => String(v ?? "").replace(/[&<>"']/g, c => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+  }[c]));
+
+  function parseDate(v) {
+    if (!v) return null;
+    const d = new Date(v);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+
+  function daysUntil(date) {
+    if (!date) return null;
+    const now = new Date();
+    now.setHours(0,0,0,0);
+    const d = new Date(date);
+    d.setHours(0,0,0,0);
+    return Math.round((d-now)/86400000);
+  }
+
+  function nextDue(last, interval) {
+    if (!last || !interval) return null;
+    const d = parseDate(last);
+    if (!d) return null;
+    d.setDate(d.getDate() + Number(interval));
+    return d;
+  }
+
+  function dueLabel(date, kind) {
+    const days = daysUntil(date);
+    if (days === null) return "";
+    const word = kind === "fert" ? "Düngen" : "Gießen";
+    if (days < 0) return `<span class="p24-badge p24-overdue">⚠ ${word} überfällig</span>`;
+    if (days === 0) return `<span class="p24-badge p24-today">💧 Heute ${word.toLowerCase()}</span>`;
+    if (days === 1) return `<span class="p24-badge p24-soon">⏰ Morgen ${word.toLowerCase()}</span>`;
+    return `<span class="p24-badge p24-normal">${word}: in ${days} Tagen</span>`;
+  }
+
+  function getPlantImage(plant, photoMap) {
+    const p = photoMap && photoMap[plant.id];
+    return p ? p : "";
+  }
+
+  function decorateCards() {
+    // Try common dashboard containers and plant card selectors without breaking V2.3.
+    const containers = document.querySelectorAll(
+      "#plants-list, #plant-list, .plants-list, .plant-grid, .plants-grid, [data-plants-list]"
+    );
+    if (!containers.length) return;
+
+    containers.forEach(container => {
+      const cards = Array.from(container.children).filter(el =>
+        el.querySelector?.("[data-plant-id], .plant-card, .plant-name, h3, h4")
+      );
+      if (!cards.length) return;
+
+      cards.forEach(card => {
+        if (card.querySelector(".p24-overview-extra")) return;
+
+        const text = card.innerText || "";
+        const button = Array.from(card.querySelectorAll("button")).find(b =>
+          /gieß|wasser|water/i.test(b.textContent || "")
+        );
+
+        const box = document.createElement("div");
+        box.className = "p24-overview-extra";
+        box.innerHTML = `
+          <div class="p24-reminders">
+            <span class="p24-badge p24-normal">🌿 Pflanzenübersicht</span>
+          </div>
+          <div class="p24-health">
+            <span>💚 Status: gesund</span>
+          </div>
+        `;
+        card.appendChild(box);
+
+        if (button) {
+          button.classList.add("p24-water-btn");
+        }
+      });
+    });
+  }
+
+  function addOverviewTools() {
+    const headings = Array.from(document.querySelectorAll("h1,h2,h3")).filter(h =>
+      /meine pflanzen|pflanzenübersicht|meine pflanzen/i.test(h.textContent || "")
+    );
+    if (!headings.length) return;
+
+    const heading = headings[0];
+    if (document.querySelector(".p24-overview-tools")) return;
+
+    const tools = document.createElement("div");
+    tools.className = "p24-overview-tools";
+    tools.innerHTML = `
+      <div class="p24-tool-title">🌿 Meine Pflanzen</div>
+      <input id="p24-filter-input" type="search" placeholder="Pflanzen suchen …" aria-label="Pflanzen suchen">
+      <select id="p24-filter-status" aria-label="Pflanzen filtern">
+        <option value="all">Alle Pflanzen</option>
+        <option value="water">Bald gießen</option>
+        <option value="fert">Bald düngen</option>
+        <option value="health">Mit Gesundheitsnotiz</option>
+      </select>
+    `;
+    heading.parentNode.insertBefore(tools, heading.nextSibling);
+
+    const input = tools.querySelector("#p24-filter-input");
+    const status = tools.querySelector("#p24-filter-status");
+
+    const apply = () => {
+      const q = (input.value || "").toLowerCase().trim();
+      const mode = status.value;
+      const selectors = "#plants-list > *, #plant-list > *, .plants-list > *, .plant-grid > *, .plants-grid > *, [data-plants-list] > *";
+      document.querySelectorAll(selectors).forEach(card => {
+        const t = (card.innerText || "").toLowerCase();
+        let ok = !q || t.includes(q);
+        if (mode === "water") ok = ok && /heute gießen|morgen gießen|gießen: in [01] tagen|gießen: in 2 tagen|gießen: in 3 tagen/i.test(t);
+        if (mode === "fert") ok = ok && /heute düngen|morgen düngen|düngen: in [0123] tagen/i.test(t);
+        if (mode === "health") ok = ok && /gesundheit|schädling|gelb|krank|problem/i.test(t);
+        card.style.display = ok ? "" : "none";
+      });
+    };
+    input.addEventListener("input", apply);
+    status.addEventListener("change", apply);
+  }
+
+  // Observe UI changes caused by the existing app's render functions.
+  const observer = new MutationObserver(() => {
+    clearTimeout(window.__p24Timer);
+    window.__p24Timer = setTimeout(() => {
+      addOverviewTools();
+      decorateCards();
+    }, 120);
+  });
+  observer.observe(document.body, {childList:true, subtree:true});
+
+  window.addEventListener("load", () => {
+    setTimeout(addOverviewTools, 300);
+    setTimeout(decorateCards, 600);
+  });
+})();

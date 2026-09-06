@@ -6,3 +6,58 @@
 .plant-catalog-item:hover{background:#f5f1e9}
 .plant-catalog-item small{display:block;opacity:.65;margin-top:2px}
 .plant-catalog-selected{margin-top:8px;padding:10px 12px;border-radius:10px;background:#e9eee4}
+
+
+
+/* Planty V2.4 – Übersicht */
+.p24-overview-tools{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  align-items:center;
+  margin:12px 0 18px;
+  padding:14px;
+  border:1px solid rgba(80,70,50,.10);
+  border-radius:16px;
+  background:rgba(250,247,240,.82);
+}
+.p24-tool-title{
+  flex:1 0 100%;
+  font-weight:700;
+  font-size:1rem;
+}
+.p24-overview-tools input,
+.p24-overview-tools select{
+  min-height:42px;
+  border:1px solid rgba(80,70,50,.18);
+  border-radius:12px;
+  padding:0 12px;
+  background:#fffdf8;
+  color:inherit;
+  box-sizing:border-box;
+}
+.p24-overview-tools input{flex:1 1 220px}
+.p24-overview-tools select{flex:0 1 210px}
+.p24-overview-extra{
+  margin-top:12px;
+  display:grid;
+  gap:8px;
+  font-size:.88rem;
+}
+.p24-reminders{display:flex;flex-wrap:wrap;gap:6px}
+.p24-badge{
+  display:inline-flex;
+  align-items:center;
+  width:max-content;
+  padding:5px 9px;
+  border-radius:999px;
+  font-size:.78rem;
+  line-height:1.2;
+  background:#eeeae0;
+}
+.p24-overdue{background:#f2dfd8}
+.p24-today{background:#e6eadc}
+.p24-soon{background:#eee7d4}
+.p24-normal{background:#e9e7df}
+.p24-health{opacity:.85}
+.p24-water-btn{font-weight:700}
