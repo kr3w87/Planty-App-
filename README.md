@@ -1,4 +1,4 @@
-# Planty V2.3 – Suche
-Die mitgelieferte Pflanzendatenbank ist in die App eingebunden.
-Suche nach deutschem oder botanischem Namen, z. B. Monstera, Palme oder Ficus.
-Nach Auswahl werden Licht, Gießintervall und Düngeintervall automatisch übernommen.
+# Planty V2.2
+Neue Pflanzen-Auswahl mit hinterlegten Pflegewerten für 10 häufige Zimmerpflanzen.
+Die Auswahl wird beim Anlegen verwendet; Name kann optional selbst vergeben werden.
+Zusätzlich: Foto, Standort, Lichtbedarf, Gießen, Düngen.
