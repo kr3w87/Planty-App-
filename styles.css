@@ -61,3 +61,13 @@
 .p24-normal{background:#e9e7df}
 .p24-health{opacity:.85}
 .p24-water-btn{font-weight:700}
+
+
+/* Planty V2.5 */
+.p25-panel{margin:0 0 20px;padding:18px;border:1px solid rgba(80,70,50,.12);border-radius:20px;background:rgba(250,247,240,.92);box-shadow:0 6px 20px rgba(60,50,30,.05)}
+.p25-head{display:flex;gap:16px;justify-content:space-between;align-items:flex-start;flex-wrap:wrap}.p25-title{font-size:1.12rem;font-weight:800}.p25-sub{font-size:.82rem;opacity:.7;margin-top:3px}
+.p25-summary{display:flex;gap:7px;flex-wrap:wrap}.p25-summary span{padding:7px 10px;border-radius:999px;background:#fffdf8;font-size:.78rem}
+.p25-list{display:grid;gap:9px;margin-top:14px}.p25-item{padding:11px 12px;border-radius:14px;background:#fffdf8;border:1px solid rgba(80,70,30,.08)}
+.p25-pills{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}.p25-pill{display:inline-flex;width:max-content;padding:5px 9px;border-radius:999px;font-size:.74rem}
+.p25-pill.overdue{background:#f1ddd7}.p25-pill.today{background:#eee6c9}.p25-pill.soon{background:#eee3d3}.p25-pill.normal{background:#e7eadf}
+@media(max-width:600px){.p25-panel{padding:14px;border-radius:16px}}

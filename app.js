@@ -213,3 +213,31 @@ $("logout").onclick=()=>db.auth.signOut();db.auth.onAuthStateChange((_,s)=>s?loa
     setTimeout(decorateCards, 600);
   });
 })();
+
+
+
+/* Planty V2.5 – Pflege-Erinnerungen */
+(function(){
+  const D=v=>{if(!v)return null;const d=new Date(v);return isNaN(d)?null:d};
+  const due=(last,n)=>{const d=D(last);if(!d||!n)return null;d.setDate(d.getDate()+Number(n));return d};
+  const diff=d=>{if(!d)return null;const a=new Date();a.setHours(0,0,0,0);const b=new Date(d);b.setHours(0,0,0,0);return Math.round((b-a)/86400000)};
+  const badge=(d,t)=>{const n=diff(d),l=t==="fert"?"Düngen":"Gießen";if(n===null)return "";
+    if(n<0)return `<span class="p25-pill overdue">🔴 ${l} überfällig</span>`;
+    if(n===0)return `<span class="p25-pill today">🟡 Heute ${l.toLowerCase()}</span>`;
+    if(n===1)return `<span class="p25-pill soon">🟠 Morgen ${l.toLowerCase()}</span>`;
+    return `<span class="p25-pill normal">🟢 ${l}: in ${n} Tagen</span>`};
+  function get(){for(const k of ["plants","myPlants","userPlants","allPlants"])if(Array.isArray(window[k]))return window[k];return[]}
+  function render(){
+    const ps=get(); if(!ps.length)return;
+    let w=0,f=0,o=0;
+    ps.forEach(p=>{const a=diff(due(p.last_watered_at,p.watering_interval_days)),b=diff(due(p.last_fertilized_at,p.fertilizing_interval_days));
+      if(a!==null&&a<=0)w++;if(b!==null&&b<=0)f++;if(a!==null&&a<0)o++;if(b!==null&&b<0)o++});
+    let box=document.getElementById("p25-reminder-panel");
+    if(!box){const main=document.querySelector("main")||document.body;box=document.createElement("section");box.id="p25-reminder-panel";box.className="p25-panel";main.insertBefore(box,main.firstChild)}
+    box.innerHTML=`<div class="p25-head"><div><div class="p25-title">🔔 Pflege-Erinnerungen</div><div class="p25-sub">Automatisch aus deinen Intervallen berechnet.</div></div><div class="p25-summary"><span>💧 ${w} fällig</span><span>🌱 ${f} fällig</span><span>🔴 ${o} überfällig</span></div></div><div class="p25-list">`+
+      ps.map(p=>`<div class="p25-item"><strong>${String(p.name||"Pflanze").replace(/[&<>"]/g,"")}</strong><div class="p25-pills">${badge(due(p.last_watered_at,p.watering_interval_days),"water")}${badge(due(p.last_fertilized_at,p.fertilizing_interval_days),"fert")}</div></div>`).join("")+
+      `</div>`;
+  }
+  window.addEventListener("load",()=>setTimeout(render,1200));
+  setInterval(render,60000);
+})();
