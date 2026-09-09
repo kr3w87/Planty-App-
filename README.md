@@ -1,15 +1,13 @@
-# Planty V3.1 · Pflegeintelligenz
+# Planty V3.2 · Statistiken & Jahresrückblick
 
-V3.1 baut auf dem V3.0 Pflanzentagebuch auf.
+Aufbauend auf V3.1 ergänzt diese Version einen persönlichen Statistikbereich.
 
 ## Neu
-- saisonale Pflegeempfehlungen für Gießen und Düngen
-- Lichtstufe beeinflusst das berechnete Gießintervall leicht
-- Winter-/Sommerlogik für Düngung
-- neues Pflegeintelligenz-Cockpit
-- verständliche Begründung je Empfehlung
-- individuelle Empfehlung direkt in der Pflanzendetailansicht
-- bestehende Supabase-Struktur bleibt kompatibel
+- Jahresstatistik für Pflegeaktionen
+- Monatsaktivität als Balkendiagramm
+- Rangliste der aktivsten Pflanzen
+- Jahreszusammenfassung
+- Anzahl der Wachstumsfotos aus Supabase
+- V3.2 Cache-Busting für GitHub Pages
 
-## Hinweis
-Die Empfehlungen sind bewusst heuristisch. Sie ersetzen nicht die Prüfung von Erde, Wurzeln und konkretem Standort.
+Die Statistik für Pflegeaktionen basiert auf dem bestehenden lokalen Planty-Tagebuch; Pflanzen und Fotos bleiben in der bestehenden Supabase-Struktur.

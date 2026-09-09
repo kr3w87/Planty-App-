@@ -83,9 +83,9 @@ function renderCockpit(){
 }
 window.fertilize=async id=>completeCare(id,'fert');
 async function load(){const r=await db.from('plants').select('*').order('created_at',{ascending:false});if(r.error){alert(r.error.message);return}plants=r.data||[];$('auth').classList.add('hidden');$('app').classList.remove('hidden');$('count').textContent=plants.length;$('water').textContent=plants.filter(p=>due(p.last_watered_at,p.watering_interval_days)).length;$('fert').textContent=plants.filter(p=>due(p.last_fertilized_at,p.fertilizing_interval_days)).length;const u=(await db.auth.getUser()).data.user,h=await db.from('plant_health_logs').select('plant_id').eq('user_id',u.id);$('issues').textContent=new Set((h.data||[]).map(x=>x.plant_id)).size;$('welcome').textContent=plants.length?`${plants.length} Pflanzen · bleib dran, sie wachsen mit dir.`:'Lege deine erste Pflanze an.';
- const rooms=[...new Set(plants.map(p=>p.location).filter(Boolean))].sort();if($('filterRoom'))$('filterRoom').innerHTML='<option value="all">Alle Standorte</option>'+rooms.map(r=>`<option>${safe(r)}</option>`).join('');
+ const u2=(await db.auth.getUser()).data.user; const pc=await db.from('plant_photos').select('id').eq('user_id',u2.id); $('statPhotos').textContent=(pc.data||[]).length; const rooms=[...new Set(plants.map(p=>p.location).filter(Boolean))].sort();if($('filterRoom'))$('filterRoom').innerHTML='<option value="all">Alle Standorte</option>'+rooms.map(r=>`<option>${safe(r)}</option>`).join('');
  const tasks=plants.filter(p=>due(p.last_watered_at,p.watering_interval_days)).map(p=>`<div class="task">💧 <span><b>${safe(p.name)}</b><br><small>Gießen</small></span><button onclick="water('${p.id}')">Gegossen ✓</button></div>`);$('tasks').innerHTML=tasks.length?tasks.slice(0,8).join(''):'<div class="task">♡ Heute ist alles erledigt</div>';
- let html='';for(const p of plants){const ph=(await photosFor(p.id))[0],url=ph?await signed(ph.photo_path):'';const fav=getFavs().has(p.id);html+=`<div class="plant" data-id="${p.id}" onclick="detail('${p.id}')"><button class="fav-btn ${fav?'active':''}" onclick="event.stopPropagation();toggleFavorite('${p.id}')" aria-label="Favorit">${fav?'♥':'♡'}</button><div class="pic">${url?`<img src="${url}" alt="">`:'🌿'}</div><h3>${safe(p.name)}</h3><p>${safe(p.species||'Zimmerpflanze')} · ${safe(p.location||'Kein Standort')}</p>${due(p.last_watered_at,p.watering_interval_days)?'<span class="badge">💧 Gießen fällig</span>':''}</div>`}$('plants').innerHTML=html+`<div class="plant addplant" onclick="openModal()">＋ Pflanze hinzufügen</div>`;applyFilters();renderReminders();renderCockpit();renderActions();renderIntelligence();renderJournal();
+ let html='';for(const p of plants){const ph=(await photosFor(p.id))[0],url=ph?await signed(ph.photo_path):'';const fav=getFavs().has(p.id);html+=`<div class="plant" data-id="${p.id}" onclick="detail('${p.id}')"><button class="fav-btn ${fav?'active':''}" onclick="event.stopPropagation();toggleFavorite('${p.id}')" aria-label="Favorit">${fav?'♥':'♡'}</button><div class="pic">${url?`<img src="${url}" alt="">`:'🌿'}</div><h3>${safe(p.name)}</h3><p>${safe(p.species||'Zimmerpflanze')} · ${safe(p.location||'Kein Standort')}</p>${due(p.last_watered_at,p.watering_interval_days)?'<span class="badge">💧 Gießen fällig</span>':''}</div>`}$('plants').innerHTML=html+`<div class="plant addplant" onclick="openModal()">＋ Pflanze hinzufügen</div>`;applyFilters();renderReminders();renderCockpit();renderActions();renderIntelligence();renderJournal();renderStats();
 }
 window.toggleFavorite=id=>{const s=getFavs();s.has(id)?s.delete(id):s.add(id);saveFavs(s);load()};
 window.water=async id=>completeCare(id,'water');
@@ -153,5 +153,29 @@ function renderIntelligence(){
     return `<div class="p31-item ${late?'late':''}"><div class="p31-icon">${x.icon}</div><div class="p31-main"><b>${safe(x.p.name)} · ${x.label}</b><small>${late?'Überfällig':today?'Heute empfohlen':'Empfohlen am '+fmt(x.date)} · Intervall ${x.interval} Tage</small><span>${safe(x.reason)}</span></div><button onclick="detail('${x.p.id}')">Details</button></div>`
   }).join(''):`<div class="p31-empty">Noch keine Pflanzen für eine Empfehlung vorhanden.</div>`;
 }
+
+function renderStats(){
+  const year=new Date().getFullYear();
+  const journal=getJournal();
+  const inYear=journal.filter(x=>new Date(x.created_at).getFullYear()===year);
+  const water=inYear.filter(x=>x.type==='water').length;
+  const fert=inYear.filter(x=>x.type==='fert').length;
+  const skip=inYear.filter(x=>x.type==='skip').length;
+  const photos=plants.reduce((n,p)=>n,0); // photo count is loaded separately below when available
+  $('statsYear').textContent=String(year);
+  $('statWater').textContent=water;
+  $('statFert').textContent=fert;
+  $('statActions').textContent=inYear.length;
+  const months=Array.from({length:12},(_,i)=>({m:i,w:0,f:0,s:0}));
+  inYear.forEach(x=>{const m=new Date(x.created_at).getMonth(); if(x.type==='water')months[m].w++; else if(x.type==='fert')months[m].f++; else if(x.type==='skip')months[m].s++;});
+  const max=Math.max(1,...months.map(x=>x.w+x.f+x.s));
+  $('activityChart').innerHTML=months.map((x,i)=>{const total=x.w+x.f+x.s;const h=Math.max(3,Math.round(total/max*100));return `<div class="p32-bar-col"><div class="p32-value">${total||''}</div><div class="p32-bar" style="height:${h}%" title="${total} Aktionen"><i style="height:${total?Math.round(x.w/total*100):0}%"></i><em style="height:${total?Math.round(x.f/total*100):0}%"></em></div><small>${['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'][i]}</small></div>`}).join('');
+  const ranking=Object.entries(inYear.reduce((a,x)=>{a[x.plant_id]=(a[x.plant_id]||0)+1;return a},{})).map(([id,n])=>({p:plants.find(p=>p.id===id),n})).filter(x=>x.p).sort((a,b)=>b.n-a.n).slice(0,5);
+  $('plantRanking').innerHTML=ranking.length?ranking.map((x,i)=>`<div class="p32-rank"><b>${i+1}</b><span>${safe(x.p.name)}<small>${x.n} ${x.n===1?'Aktion':'Aktionen'}</small></span><strong>${Math.round(x.n/Math.max(1,inYear.length)*100)}%</strong></div>`).join(''):'<div class="p32-empty">Noch keine Pflegeaktionen in diesem Jahr.</div>';
+  const first=inYear.length?new Date(Math.min(...inYear.map(x=>new Date(x.created_at)))):null;
+  const daysActive=first?Math.max(1,Math.floor((new Date()-first)/86400000)+1):0;
+  $('yearSummary').innerHTML=`<div class="p32-summary-grid"><div><b>${inYear.length}</b><small>Aktionen 2026</small></div><div><b>${skip}</b><small>Übersprungen</small></div><div><b>${daysActive}</b><small>Tage dokumentiert</small></div><div><b>${plants.length}</b><small>Pflanzen aktuell</small></div></div><p>${inYear.length?`Du hast dieses Jahr bereits <strong>${water}</strong> Gießvorgänge dokumentiert. Weiter so – kleine regelmäßige Schritte machen dein Tagebuch wertvoll.`:'Sobald du deine ersten Pflegeaktionen erledigst, baut Planty hier deinen persönlichen Jahresrückblick auf.'}</p>`;
+}
+
 function renderReminders(){const dueW=plants.filter(p=>due(p.last_watered_at,p.watering_interval_days)).length,dueF=plants.filter(p=>due(p.last_fertilized_at,p.fertilizing_interval_days)).length;const box=$('p25-reminder-panel');if(box)box.innerHTML=`<div class="p25-head"><div><div class="p25-title">🔔 Pflege-Erinnerungen</div><div class="p25-sub">Automatisch aus deinen Intervallen berechnet.</div></div><div class="p25-summary"><span>💧 ${dueW} fällig</span><span>🌱 ${dueF} fällig</span></div></div>`}
 $('logout').onclick=()=>db.auth.signOut();db.auth.onAuthStateChange((_,s)=>s?load():auth());fillCatalog();session();
