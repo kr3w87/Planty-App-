@@ -85,7 +85,7 @@ window.fertilize=async id=>completeCare(id,'fert');
 async function load(){const r=await db.from('plants').select('*').order('created_at',{ascending:false});if(r.error){alert(r.error.message);return}plants=r.data||[];$('auth').classList.add('hidden');$('app').classList.remove('hidden');$('count').textContent=plants.length;$('water').textContent=plants.filter(p=>due(p.last_watered_at,p.watering_interval_days)).length;$('fert').textContent=plants.filter(p=>due(p.last_fertilized_at,p.fertilizing_interval_days)).length;const u=(await db.auth.getUser()).data.user,h=await db.from('plant_health_logs').select('plant_id').eq('user_id',u.id);$('issues').textContent=new Set((h.data||[]).map(x=>x.plant_id)).size;$('welcome').textContent=plants.length?`${plants.length} Pflanzen · bleib dran, sie wachsen mit dir.`:'Lege deine erste Pflanze an.';
  const u2=(await db.auth.getUser()).data.user; const pc=await db.from('plant_photos').select('id').eq('user_id',u2.id); $('statPhotos').textContent=(pc.data||[]).length; const rooms=[...new Set(plants.map(p=>p.location).filter(Boolean))].sort();if($('filterRoom'))$('filterRoom').innerHTML='<option value="all">Alle Standorte</option>'+rooms.map(r=>`<option>${safe(r)}</option>`).join('');
  const tasks=plants.filter(p=>due(p.last_watered_at,p.watering_interval_days)).map(p=>`<div class="task">💧 <span><b>${safe(p.name)}</b><br><small>Gießen</small></span><button onclick="water('${p.id}')">Gegossen ✓</button></div>`);$('tasks').innerHTML=tasks.length?tasks.slice(0,8).join(''):'<div class="task">♡ Heute ist alles erledigt</div>';
- let html='';for(const p of plants){const ph=(await photosFor(p.id))[0],url=ph?await signed(ph.photo_path):'';const fav=getFavs().has(p.id);html+=`<div class="plant" data-id="${p.id}" onclick="detail('${p.id}')"><button class="fav-btn ${fav?'active':''}" onclick="event.stopPropagation();toggleFavorite('${p.id}')" aria-label="Favorit">${fav?'♥':'♡'}</button><div class="pic">${url?`<img src="${url}" alt="">`:'🌿'}</div><h3>${safe(p.name)}</h3><p>${safe(p.species||'Zimmerpflanze')} · ${safe(p.location||'Kein Standort')}</p>${due(p.last_watered_at,p.watering_interval_days)?'<span class="badge">💧 Gießen fällig</span>':''}</div>`}$('plants').innerHTML=html+`<div class="plant addplant" onclick="openModal()">＋ Pflanze hinzufügen</div>`;applyFilters();renderReminders();renderCockpit();renderActions();renderIntelligence();renderJournal();renderStats();
+ let html='';for(const p of plants){const ph=(await photosFor(p.id))[0],url=ph?await signed(ph.photo_path):'';const fav=getFavs().has(p.id);html+=`<div class="plant" data-id="${p.id}" onclick="detail('${p.id}')"><button class="fav-btn ${fav?'active':''}" onclick="event.stopPropagation();toggleFavorite('${p.id}')" aria-label="Favorit">${fav?'♥':'♡'}</button><div class="pic">${url?`<img src="${url}" alt="">`:'🌿'}</div><h3>${safe(p.name)}</h3><p>${safe(p.species||'Zimmerpflanze')} · ${safe(p.location||'Kein Standort')}</p>${due(p.last_watered_at,p.watering_interval_days)?'<span class="badge">💧 Gießen fällig</span>':''}</div>`}$('plants').innerHTML=html+`<div class="plant addplant" onclick="openModal()">＋ Pflanze hinzufügen</div>`;applyFilters();renderReminders();renderCockpit();renderActions();renderIntelligence();renderJournal();renderStats();renderCalendar();
 }
 window.toggleFavorite=id=>{const s=getFavs();s.has(id)?s.delete(id):s.add(id);saveFavs(s);load()};
 window.water=async id=>completeCare(id,'water');
@@ -176,6 +176,48 @@ function renderStats(){
   const daysActive=first?Math.max(1,Math.floor((new Date()-first)/86400000)+1):0;
   $('yearSummary').innerHTML=`<div class="p32-summary-grid"><div><b>${inYear.length}</b><small>Aktionen 2026</small></div><div><b>${skip}</b><small>Übersprungen</small></div><div><b>${daysActive}</b><small>Tage dokumentiert</small></div><div><b>${plants.length}</b><small>Pflanzen aktuell</small></div></div><p>${inYear.length?`Du hast dieses Jahr bereits <strong>${water}</strong> Gießvorgänge dokumentiert. Weiter so – kleine regelmäßige Schritte machen dein Tagebuch wertvoll.`:'Sobald du deine ersten Pflegeaktionen erledigst, baut Planty hier deinen persönlichen Jahresrückblick auf.'}</p>`;
 }
+
+
+// V3.3 – interaktiver Pflegekalender
+let calendarDate=new Date(new Date().getFullYear(),new Date().getMonth(),1);
+let calendarFilter='all';
+function localDayKey(d){const x=new Date(d);return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`}
+function calendarEvents(){
+  const events=[];
+  for(const x of getJournal()){
+    const p=plants.find(y=>y.id===x.plant_id);
+    events.push({date:x.created_at,type:x.type==='water'?'water':x.type==='fert'?'fert':'skip',icon:x.type==='water'?'💧':x.type==='fert'?'🌱':'⏭️',title:x.label||'Pflegeaktion',plant:p?.name||'Pflanze',note:x.note||''});
+  }
+  return events;
+}
+function renderCalendar(){
+  const grid=$('calendarGrid'), title=$('calTitle'); if(!grid||!title)return;
+  const y=calendarDate.getFullYear(),m=calendarDate.getMonth();
+  title.textContent=new Intl.DateTimeFormat('de-DE',{month:'long',year:'numeric'}).format(calendarDate);
+  const first=new Date(y,m,1), offset=(first.getDay()+6)%7, daysIn=new Date(y,m+1,0).getDate();
+  const prevDays=new Date(y,m,0).getDate();
+  const events=calendarEvents(); const map={};
+  for(const e of events){const k=localDayKey(e.date);(map[k]??=[]).push(e)}
+  let html='';
+  for(let i=0;i<42;i++){
+    const n=i-offset+1; const date=new Date(y,m,n); const inMonth=date.getMonth()===m;
+    const key=localDayKey(date); let ev=(map[key]||[]).filter(e=>calendarFilter==='all'||e.type===calendarFilter);
+    const isToday=key===localDayKey(new Date());
+    html+=`<button class="p33-day ${inMonth?'':'muted'} ${isToday?'today':''}" data-date="${key}"><span class="p33-day-num">${date.getDate()}</span>${ev.length?`<span class="p33-dots">${ev.slice(0,4).map(e=>`<i title="${safe(e.title)}">${e.icon}</i>`).join('')}</span><small>${ev.length} ${ev.length===1?'Eintrag':'Einträge'}</small>`:''}</button>`;
+  }
+  grid.innerHTML=html;
+  grid.querySelectorAll('.p33-day').forEach(b=>b.onclick=()=>showCalendarDay(b.dataset.date));
+}
+function showCalendarDay(key){
+  const box=$('calendarDetails'); if(!box)return;
+  const events=calendarEvents().filter(e=>localDayKey(e.date)===key).filter(e=>calendarFilter==='all'||e.type===calendarFilter);
+  const date=new Date(key+'T12:00:00');
+  if(!events.length){box.innerHTML=`<div class="p33-empty"><b>${fmt(date)}</b><br>Keine Einträge für diesen Tag.</div>`;return}
+  box.innerHTML=`<div class="p33-detail-head"><b>${new Intl.DateTimeFormat('de-DE',{weekday:'long',day:'numeric',month:'long'}).format(date)}</b><span>${events.length} ${events.length===1?'Eintrag':'Einträge'}</span></div>`+events.map(e=>`<div class="p33-event"><span>${e.icon}</span><div><b>${safe(e.plant)} · ${safe(e.title)}</b><small>${new Intl.DateTimeFormat('de-DE',{hour:'2-digit',minute:'2-digit'}).format(new Date(e.date))}${e.note?' · '+safe(e.note):''}</small></div></div>`).join('');
+}
+$('calPrev')?.addEventListener('click',()=>{calendarDate.setMonth(calendarDate.getMonth()-1);renderCalendar()});
+$('calNext')?.addEventListener('click',()=>{calendarDate.setMonth(calendarDate.getMonth()+1);renderCalendar()});
+document.querySelectorAll('.p33-filter').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('.p33-filter').forEach(x=>x.classList.remove('active'));b.classList.add('active');calendarFilter=b.dataset.calFilter;renderCalendar()}));
 
 function renderReminders(){const dueW=plants.filter(p=>due(p.last_watered_at,p.watering_interval_days)).length,dueF=plants.filter(p=>due(p.last_fertilized_at,p.fertilizing_interval_days)).length;const box=$('p25-reminder-panel');if(box)box.innerHTML=`<div class="p25-head"><div><div class="p25-title">🔔 Pflege-Erinnerungen</div><div class="p25-sub">Automatisch aus deinen Intervallen berechnet.</div></div><div class="p25-summary"><span>💧 ${dueW} fällig</span><span>🌱 ${dueF} fällig</span></div></div>`}
 $('logout').onclick=()=>db.auth.signOut();db.auth.onAuthStateChange((_,s)=>s?load():auth());fillCatalog();session();
