@@ -2,6 +2,8 @@ const SUPABASE_URL="https://trmtgocglawidplcagzc.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY="sb_publishable_NbJQhCF0GKDljAB2cOxhpw_Lva2P51L";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);
 let signup=false,current=null,plants=[],careHistory=[],calendarExtraEvents=[];
+let loading=false;
+let authReady=false;
 const $=id=>document.getElementById(id);
 const safe=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
 const days=(d,n)=>{const x=new Date(d);x.setDate(x.getDate()+Number(n));return x};
@@ -73,10 +75,29 @@ async function loadCalendarExtras(){
   calendarExtraEvents=out;
 }
 
-function auth(){$('auth').classList.remove('hidden');$('app').classList.add('hidden')}
-async function session(){const r=await db.auth.getSession();r.data.session?load():auth()}
+function auth(msg=''){ $('auth').classList.remove('hidden'); $('app').classList.add('hidden'); if(msg) $('authMsg').textContent=msg; }
+async function session(){
+  try {
+    const r=await db.auth.getSession();
+    if(r.error){ auth('Supabase-Sitzung konnte nicht geladen werden: '+r.error.message); return; }
+    authReady=true;
+    if(r.data?.session) await load(); else auth();
+  } catch(e){ auth('Verbindungsfehler: '+(e?.message||e)); }
+}
 $('mode').onclick=()=>{signup=!signup;$('title').textContent=signup?'Konto erstellen':'Willkommen zurück';$('authBtn').textContent=signup?'REGISTRIEREN':'ANMELDEN';$('mode').textContent=signup?'Schon registriert? Anmelden':'Noch kein Konto? Registrieren'};
-$('authForm').onsubmit=async e=>{e.preventDefault();const r=signup?await db.auth.signUp({email:$('email').value,password:$('password').value}):await db.auth.signInWithPassword({email:$('email').value,password:$('password').value});if(r.error){$('authMsg').textContent=r.error.message;return}if(signup&&!r.data.session){$('authMsg').textContent='Konto erstellt. Bitte prüfe deine E-Mail.';return}load()};
+$('authForm').onsubmit=async e=>{
+  e.preventDefault();
+  const email=$('email').value.trim(), password=$('password').value;
+  $('authBtn').disabled=true; $('authMsg').textContent='Anmeldung läuft …';
+  try {
+    const r=signup ? await db.auth.signUp({email,password}) : await db.auth.signInWithPassword({email,password});
+    if(r.error){ $('authMsg').textContent=r.error.message; return; }
+    if(signup && !r.data?.session){ $('authMsg').textContent='Konto erstellt. Bitte prüfe deine E-Mail.'; return; }
+    $('authMsg').textContent='';
+    await load();
+  } catch(e){ $('authMsg').textContent='Anmeldung fehlgeschlagen: '+(e?.message||e); }
+  finally { $('authBtn').disabled=false; }
+};
 async function signed(path){const r=await db.storage.from('plant-photos').createSignedUrl(path,3600);return r.data?.signedUrl||''}
 async function photosFor(id){const r=await db.from('plant_photos').select('*').eq('plant_id',id).order('taken_at',{ascending:false});return r.data||[]}
 async function healthFor(id){const r=await db.from('plant_health_logs').select('*').eq('plant_id',id).order('created_at',{ascending:false});return r.data||[]}
@@ -116,11 +137,44 @@ function renderCockpit(){
   $('recentPlants').innerHTML=plants.slice(0,5).map(p=>`<div class="p28-item"><div><b>${safe(p.name)}</b><small>${safe(p.species||'Zimmerpflanze')} · ${fmt(p.created_at)}</small></div><button onclick="detail('${p.id}')">Öffnen</button></div>`).join('')||'<div class="p28-empty">Noch keine Pflanzen.</div>';
 }
 window.fertilize=async id=>completeCare(id,'fert');
-async function load(){const r=await db.from('plants').select('*').order('created_at',{ascending:false});if(r.error){alert(r.error.message);return}plants=r.data||[];const u=(await db.auth.getUser()).data.user;if(u){window.plantyUserId=u.id;await migrateLocalJournal();await loadCareHistory();await loadCalendarExtras();}$('auth').classList.add('hidden');$('app').classList.remove('hidden');$('count').textContent=plants.length;$('water').textContent=plants.filter(p=>due(p.last_watered_at,p.watering_interval_days)).length;$('fert').textContent=plants.filter(p=>due(p.last_fertilized_at,p.fertilizing_interval_days)).length;const h=await db.from('plant_health_logs').select('plant_id').eq('user_id',u.id);$('issues').textContent=new Set((h.data||[]).map(x=>x.plant_id)).size;$('welcome').textContent=plants.length?`${plants.length} Pflanzen · bleib dran, sie wachsen mit dir.`:'Lege deine erste Pflanze an.';
- const u2=(await db.auth.getUser()).data.user; const pc=await db.from('plant_photos').select('id').eq('user_id',u2.id); $('statPhotos').textContent=(pc.data||[]).length; const rooms=[...new Set(plants.map(p=>p.location).filter(Boolean))].sort();if($('filterRoom'))$('filterRoom').innerHTML='<option value="all">Alle Standorte</option>'+rooms.map(r=>`<option>${safe(r)}</option>`).join('');
- const tasks=plants.filter(p=>due(p.last_watered_at,p.watering_interval_days)).map(p=>`<div class="task">💧 <span><b>${safe(p.name)}</b><br><small>Gießen</small></span><button onclick="water('${p.id}')">Gegossen ✓</button></div>`);$('tasks').innerHTML=tasks.length?tasks.slice(0,8).join(''):'<div class="task">♡ Heute ist alles erledigt</div>';
- let html='';for(const p of plants){const ph=(await photosFor(p.id))[0],url=ph?await signed(ph.photo_path):'';const fav=getFavs().has(p.id);html+=`<div class="plant" data-id="${p.id}" onclick="detail('${p.id}')"><button class="fav-btn ${fav?'active':''}" onclick="event.stopPropagation();toggleFavorite('${p.id}')" aria-label="Favorit">${fav?'♥':'♡'}</button><div class="pic">${url?`<img src="${url}" alt="">`:'🌿'}</div><h3>${safe(p.name)}</h3><p>${safe(p.species||'Zimmerpflanze')} · ${safe(p.location||'Kein Standort')}</p>${due(p.last_watered_at,p.watering_interval_days)?'<span class="badge">💧 Gießen fällig</span>':''}</div>`}$('plants').innerHTML=html+`<div class="plant addplant" onclick="openModal()">＋ Pflanze hinzufügen</div>`;applyFilters();renderReminders();renderCockpit();renderActions();renderIntelligence();renderJournal();renderStats();
-  renderCalendar();renderCalendar();
+async function load(){
+  if(loading) return;
+  loading=true;
+  try {
+    const ur=await db.auth.getUser();
+    if(ur.error || !ur.data?.user){ auth(ur.error?.message||'Bitte melde dich erneut an.'); return; }
+    const u=ur.data.user;
+    window.plantyUserId=u.id;
+    const r=await db.from('plants').select('*').order('created_at',{ascending:false});
+    if(r.error){ auth('Datenbankfehler: '+r.error.message); return; }
+    plants=r.data||[];
+    await migrateLocalJournal();
+    await loadCareHistory();
+    await loadCalendarExtras();
+    $('auth').classList.add('hidden'); $('app').classList.remove('hidden');
+    $('count').textContent=plants.length;
+    $('water').textContent=plants.filter(p=>due(p.last_watered_at,p.watering_interval_days)).length;
+    $('fert').textContent=plants.filter(p=>due(p.last_fertilized_at,p.fertilizing_interval_days)).length;
+    const h=await db.from('plant_health_logs').select('plant_id').eq('user_id',u.id);
+    $('issues').textContent=new Set((h.data||[]).map(x=>x.plant_id)).size;
+    $('welcome').textContent=plants.length?`${plants.length} Pflanzen · bleib dran, sie wachsen mit dir.`:'Lege deine erste Pflanze an.';
+    const pc=await db.from('plant_photos').select('id').eq('user_id',u.id);
+    $('statPhotos').textContent=(pc.data||[]).length;
+    const rooms=[...new Set(plants.map(p=>p.location).filter(Boolean))].sort();
+    if($('filterRoom')) $('filterRoom').innerHTML='<option value="all">Alle Standorte</option>'+rooms.map(r=>`<option>${safe(r)}</option>`).join('');
+    const tasks=plants.filter(p=>due(p.last_watered_at,p.watering_interval_days)).map(p=>`<div class="task">💧 <span><b>${safe(p.name)}</b><br><small>Gießen</small></span><button onclick="water('${p.id}')">Gegossen ✓</button></div>`);
+    $('tasks').innerHTML=tasks.length?tasks.slice(0,8).join(''):'<div class="task">♡ Heute ist alles erledigt</div>';
+    let html='';
+    for(const p of plants){
+      const ph=(await photosFor(p.id))[0],url=ph?await signed(ph.photo_path):'';
+      const fav=getFavs().has(p.id);
+      html+=`<div class="plant" data-id="${p.id}" onclick="detail('${p.id}')"><button class="fav-btn ${fav?'active':''}" onclick="event.stopPropagation();toggleFavorite('${p.id}')" aria-label="Favorit">${fav?'♥':'♡'}</button><div class="pic">${url?`<img src="${url}" alt="">`:'🌿'}</div><h3>${safe(p.name)}</h3><p>${safe(p.species||'Zimmerpflanze')} · ${safe(p.location||'Kein Standort')}</p>${due(p.last_watered_at,p.watering_interval_days)?'<span class="badge">💧 Gießen fällig</span>':''}</div>`;
+    }
+    $('plants').innerHTML=html+`<div class="plant addplant" onclick="openModal()">＋ Pflanze hinzufügen</div>`;
+    applyFilters(); renderReminders(); renderCockpit(); renderActions(); renderIntelligence(); renderJournal(); renderStats(); renderCalendar();
+  } catch(e){
+    auth('Fehler beim Laden: '+(e?.message||e));
+  } finally { loading=false; }
 }
 window.toggleFavorite=id=>{const s=getFavs();s.has(id)?s.delete(id):s.add(id);saveFavs(s);load()};
 window.water=async id=>completeCare(id,'water');
@@ -256,4 +310,9 @@ $('calNext')?.addEventListener('click',()=>{calendarDate.setMonth(calendarDate.g
 document.querySelectorAll('.p33-filter').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('.p33-filter').forEach(x=>x.classList.remove('active'));b.classList.add('active');calendarFilter=b.dataset.calFilter;renderCalendar()}));
 
 function renderReminders(){const dueW=plants.filter(p=>due(p.last_watered_at,p.watering_interval_days)).length,dueF=plants.filter(p=>due(p.last_fertilized_at,p.fertilizing_interval_days)).length;const box=$('p25-reminder-panel');if(box)box.innerHTML=`<div class="p25-head"><div><div class="p25-title">🔔 Pflege-Erinnerungen</div><div class="p25-sub">Automatisch aus deinen Intervallen berechnet.</div></div><div class="p25-summary"><span>💧 ${dueW} fällig</span><span>🌱 ${dueF} fällig</span></div></div>`}
-$('logout').onclick=()=>db.auth.signOut();db.auth.onAuthStateChange((_,s)=>s?load():auth());fillCatalog();session();
+$('logout').onclick=async()=>{await db.auth.signOut();auth();};
+db.auth.onAuthStateChange((event,s)=>{
+  if(event==='SIGNED_OUT'){ window.plantyUserId=null; auth(); return; }
+  if(s && authReady) setTimeout(()=>load(),0);
+});
+fillCatalog();session();
