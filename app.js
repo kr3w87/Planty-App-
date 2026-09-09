@@ -310,6 +310,22 @@ $('calNext')?.addEventListener('click',()=>{calendarDate.setMonth(calendarDate.g
 document.querySelectorAll('.p33-filter').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('.p33-filter').forEach(x=>x.classList.remove('active'));b.classList.add('active');calendarFilter=b.dataset.calFilter;renderCalendar()}));
 
 function renderReminders(){const dueW=plants.filter(p=>due(p.last_watered_at,p.watering_interval_days)).length,dueF=plants.filter(p=>due(p.last_fertilized_at,p.fertilizing_interval_days)).length;const box=$('p25-reminder-panel');if(box)box.innerHTML=`<div class="p25-head"><div><div class="p25-title">🔔 Pflege-Erinnerungen</div><div class="p25-sub">Automatisch aus deinen Intervallen berechnet.</div></div><div class="p25-summary"><span>💧 ${dueW} fällig</span><span>🌱 ${dueF} fällig</span></div></div>`}
+
+/* V3.5 · Seiten-Navigation: vorhandene Funktionen bleiben erhalten, aber werden in klare Bereiche aufgeteilt. */
+const pageButtons=[...document.querySelectorAll('.app-nav-btn')];
+const pageSections=[...document.querySelectorAll('[data-page-section]')];
+function showPage(page,scroll=true){
+  pageButtons.forEach(b=>b.classList.toggle('active',b.dataset.page===page));
+  pageSections.forEach(el=>el.classList.toggle('page-section-hidden',el.dataset.pageSection!==page));
+  if(page==='plants'){setTimeout(()=>{if(typeof applyFilters==='function')applyFilters()},0)}
+  if(page==='calendar'){setTimeout(()=>{if(typeof renderCalendar==='function')renderCalendar()},0)}
+  if(page==='journal'){setTimeout(()=>{if(typeof renderJournal==='function')renderJournal()},0)}
+  if(page==='stats'){setTimeout(()=>{if(typeof renderStats==='function')renderStats()},0)}
+  if(scroll)window.scrollTo({top:0,behavior:'smooth'});
+}
+pageButtons.forEach(b=>b.addEventListener('click',()=>showPage(b.dataset.page)));
+showPage('home',false);
+
 $('logout').onclick=async()=>{await db.auth.signOut();auth();};
 db.auth.onAuthStateChange((event,s)=>{
   if(event==='SIGNED_OUT'){ window.plantyUserId=null; auth(); return; }
