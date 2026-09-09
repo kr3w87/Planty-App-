@@ -1,13 +1,10 @@
-# Planty V3.2 · Statistiken & Jahresrückblick
+# Planty V3.4 – Dauerhafter Pflegeverlauf
 
-Aufbauend auf V3.1 ergänzt diese Version einen persönlichen Statistikbereich.
+V3.4 speichert Gießen, Düngen und Überspringen dauerhaft in Supabase über die neue Tabelle `plant_care_logs`. Der Pflegekalender kombiniert diese Pflegeaktionen mit Wachstumsfotos und Gesundheitsbeobachtungen.
 
-## Neu
-- Jahresstatistik für Pflegeaktionen
-- Monatsaktivität als Balkendiagramm
-- Rangliste der aktivsten Pflanzen
-- Jahreszusammenfassung
-- Anzahl der Wachstumsfotos aus Supabase
-- V3.2 Cache-Busting für GitHub Pages
+## Einrichten
+1. In Supabase SQL Editor die Datei `supabase-v3.4-care-log.sql` ausführen.
+2. Danach `index.html` öffnen bzw. auf GitHub Pages deployen.
+3. Bereits vorhandene lokale V3.0/V3.3-Pflegeeinträge werden beim ersten Login automatisch nach Supabase übernommen.
 
-Die Statistik für Pflegeaktionen basiert auf dem bestehenden lokalen Planty-Tagebuch; Pflanzen und Fotos bleiben in der bestehenden Supabase-Struktur.
+Ohne die neue Tabelle bleibt Planty als Fallback mit lokalem Pflegeverlauf funktionsfähig.

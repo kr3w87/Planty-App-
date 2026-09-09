@@ -1,7 +1,7 @@
 const SUPABASE_URL="https://trmtgocglawidplcagzc.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY="sb_publishable_NbJQhCF0GKDljAB2cOxhpw_Lva2P51L";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);
-let signup=false,current=null,plants=[];
+let signup=false,current=null,plants=[],careHistory=[],calendarExtraEvents=[];
 const $=id=>document.getElementById(id);
 const safe=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
 const days=(d,n)=>{const x=new Date(d);x.setDate(x.getDate()+Number(n));return x};
@@ -11,10 +11,10 @@ const catalog=Array.isArray(window.PLANT_DATABASE)?window.PLANT_DATABASE:[];
 const favoritesKey="planty:favorites";
 const getFavs=()=>new Set(JSON.parse(localStorage.getItem(favoritesKey)||"[]"));
 const saveFavs=s=>localStorage.setItem(favoritesKey,JSON.stringify([...s]));
-const journalKey=()=>`planty:journal:${(db.auth.getSession && "user")||"user"}`;
-const getJournal=()=>{try{return JSON.parse(localStorage.getItem(journalKey())||"[]")}catch{return[]}};
-const addJournal=(entry)=>{const list=getJournal();list.unshift({...entry,id:crypto.randomUUID(),created_at:new Date().toISOString()});localStorage.setItem(journalKey(),JSON.stringify(list.slice(0,500)));};
-const journalFor=id=>getJournal().filter(x=>x.plant_id===id);
+const journalKey=uid=>`planty:journal:${uid||"user"}`;
+const getJournal=()=>{try{const uid=window.plantyUserId;const primary=JSON.parse(localStorage.getItem(journalKey(uid))||"[]");if(primary.length||!uid)return primary;return JSON.parse(localStorage.getItem(journalKey("user"))||"[]")}catch{return[]}};
+const addJournal=(entry)=>{const list=getJournal();list.unshift({...entry,id:crypto.randomUUID(),created_at:new Date().toISOString()});localStorage.setItem(journalKey(window.plantyUserId),JSON.stringify(list.slice(0,500)));};
+const journalFor=id=>careHistory.filter(x=>x.plant_id===id);
 function renderJournal(){const list=getJournal(), waterCount=list.filter(x=>x.type==='water').length; $('journalTotal').textContent=list.length; $('journalWater').textContent=waterCount; const rows=list.slice(0,8); $('journalList').innerHTML=rows.length?rows.map(x=>{const p=plants.find(y=>y.id===x.plant_id);return `<div class="p30-entry"><span class="journal-icon">${x.type==='water'?'💧':x.type==='fert'?'🌱':x.type==='skip'?'⏭️':'📝'}</span><div class="p30-entry-main"><b>${safe(p?.name||'Pflanze')}</b><small>${safe(x.label||'Pflegeaktion')}${x.note?' · '+safe(x.note):''}</small></div><span class="p30-entry-time">${fmt(x.created_at)}</span></div>`}).join(''):`<div class="p30-empty">Noch keine Pflegeaktionen. Erledige deine erste Aufgabe – sie erscheint hier automatisch.</div>`; if(rows.length<list.length)$('journalList').insertAdjacentHTML('beforeend','<button class="link p30-more" onclick="openJournal()">Alle Einträge anzeigen</button>');}
 window.openJournal=()=>{$('journalModalBody').innerHTML=getJournal().length?getJournal().map(x=>{const p=plants.find(y=>y.id===x.plant_id);return `<div class="p30-entry"><span class="journal-icon">${x.type==='water'?'💧':x.type==='fert'?'🌱':x.type==='skip'?'⏭️':'📝'}</span><div class="p30-entry-main"><b>${safe(p?.name||'Pflanze')}</b><small>${safe(x.label||'Pflegeaktion')}${x.note?' · '+safe(x.note):''}</small></div><span class="p30-entry-time">${fmt(x.created_at)}</span></div>`}).join(''):'<div class="p30-empty">Noch keine Einträge.</div>';$('journalModal').classList.remove('hidden')};
 $('journalClose').onclick=()=>$('journalModal').classList.add('hidden');
@@ -38,6 +38,40 @@ function selectCatalog(i){
 }
 $('plantCatalogSearch').oninput=showCatalogResults;
 $('plantType').onchange=()=>{const p=catalog[+$('plantType').value];if(!p){$('plantInfo').classList.add('hidden');return}$('plantInfo').classList.remove('hidden');$('plantInfo').innerHTML=`<b>${safe(p.name)}</b><br>☀️ ${safe(p.light)} · 💧 alle ${p.watering} Tage · 🌱 alle ${p.fertilizing} Tage`;$('name').placeholder=`Eigener Name, z. B. Meine ${p.name}`};
+
+async function loadCareHistory(){
+  const r=await db.from('plant_care_logs').select('*').order('performed_at',{ascending:false});
+  if(!r.error){careHistory=r.data||[];return true}
+  careHistory=getJournal();
+  return false;
+}
+async function migrateLocalJournal(){
+  const uid=window.plantyUserId;if(!uid)return;
+  const legacy=JSON.parse(localStorage.getItem(journalKey('user'))||'[]');
+  const currentLocal=JSON.parse(localStorage.getItem(journalKey(uid))||'[]');
+  const all=[...currentLocal,...legacy.filter(x=>!currentLocal.some(y=>y.id===x.id))];
+  if(!all.length)return;
+  const rows=all.map(x=>({id:x.id,plant_id:x.plant_id,user_id:uid,type:x.type==='water'?'water':x.type==='fert'?'fert':'skip',performed_at:x.created_at||new Date().toISOString(),note:x.note||null}));
+  const r=await db.from('plant_care_logs').upsert(rows,{onConflict:'id'});
+  if(!r.error){localStorage.setItem(journalKey(uid),JSON.stringify(all.slice(0,500)));localStorage.removeItem(journalKey('user'));}
+}
+async function logCare(id,type,note=null){
+  const row={plant_id:id,user_id:window.plantyUserId,type,performed_at:new Date().toISOString(),note};
+  const r=await db.from('plant_care_logs').insert(row);
+  addJournal({plant_id:id,type,label:type==='water'?'Gießen erledigt':type==='fert'?'Düngen erledigt':'Pflegeaktion',note});
+  return r;
+}
+async function loadCalendarExtras(){
+  const ids=plants.map(p=>p.id);if(!ids.length){calendarExtraEvents=[];return}
+  const [ph,he]=await Promise.all([
+    db.from('plant_photos').select('id,plant_id,taken_at,note').in('plant_id',ids),
+    db.from('plant_health_logs').select('id,plant_id,created_at,problem,severity,description').in('plant_id',ids)
+  ]);
+  const out=[];
+  for(const x of (ph.data||[])){const p=plants.find(y=>y.id===x.plant_id);out.push({date:x.taken_at,type:'photo',icon:'📸',title:x.note||'Wachstumsfoto',plant:p?.name||'Pflanze',note:''})}
+  for(const x of (he.data||[])){const p=plants.find(y=>y.id===x.plant_id);out.push({date:x.created_at,type:'health',icon:'🩺',title:x.problem||'Beobachtung',plant:p?.name||'Pflanze',note:x.description||x.severity||''})}
+  calendarExtraEvents=out;
+}
 
 function auth(){$('auth').classList.remove('hidden');$('app').classList.add('hidden')}
 async function session(){const r=await db.auth.getSession();r.data.session?load():auth()}
@@ -65,8 +99,8 @@ function renderActions(){
   const entries=actionEntries();
   list.innerHTML=entries.length?entries.map(x=>{const state=careState(x.date);return `<div class="p29-action ${state}"><div class="p29-action-main"><span class="p29-icon">${x.icon}</span><div><b>${safe(x.plant.name)} · ${x.label}</b><small>${state==='overdue'?'Überfällig seit '+fmt(x.date):state==='today'?'Heute fällig':'Fällig am '+fmt(x.date)}</small></div></div><div class="p29-buttons"><button class="primary-action" onclick="completeCare('${x.plant.id}','${x.type}')">✓ Erledigt</button><button onclick="skipCare('${x.plant.id}','${x.type}')">Überspringen</button></div></div>`}).join(''):'<div class="p29-empty">🎉 Keine offenen Pflegeaktionen. Deine Pflanzen sind im Plan.</div>';
 }
-window.completeCare=async(id,type)=>{const p=plants.find(x=>x.id===id);if(!p)return;const field=type==='water'?'last_watered_at':'last_fertilized_at',now=new Date().toISOString();const r=await db.from('plants').update({[field]:now}).eq('id',id);if(r.error){alert(r.error.message);return}addJournal({plant_id:id,type,label:type==='water'?'Gießen erledigt':'Düngen erledigt'});load()};
-window.skipCare=async(id,type)=>{const p=plants.find(x=>x.id===id);if(!p)return;const interval=type==='water'?p.watering_interval_days:p.fertilizing_interval_days;const field=type==='water'?'last_watered_at':'last_fertilized_at';const base=actionDate(p,type)||new Date();const next=new Date(base);next.setDate(next.getDate()+Number(interval||7));const r=await db.from('plants').update({[field]:next.toISOString()}).eq('id',id);if(r.error){alert(r.error.message);return}addJournal({plant_id:id,type:'skip',label:type==='water'?'Gießen übersprungen':'Düngen übersprungen',note:`Neuer Termin ${fmt(next)}`});load()};
+window.completeCare=async(id,type)=>{const p=plants.find(x=>x.id===id);if(!p)return;const field=type==='water'?'last_watered_at':'last_fertilized_at',now=new Date().toISOString();const r=await db.from('plants').update({[field]:now}).eq('id',id);if(r.error){alert(r.error.message);return}await logCare(id,type);await load()};
+window.skipCare=async(id,type)=>{const p=plants.find(x=>x.id===id);if(!p)return;const interval=type==='water'?p.watering_interval_days:p.fertilizing_interval_days;const field=type==='water'?'last_watered_at':'last_fertilized_at';const base=actionDate(p,type)||new Date();const next=new Date(base);next.setDate(next.getDate()+Number(interval||7));const r=await db.from('plants').update({[field]:next.toISOString()}).eq('id',id);if(r.error){alert(r.error.message);return}await logCare(id,'skip',`Neuer Termin ${fmt(next)}`);await load()};
 function renderCockpit(){
   const entries=careEntries(), overdue=entries.filter(x=>careState(x.date)==='overdue'), today=entries.filter(x=>careState(x.date)==='today');
   const weekEnd=new Date();weekEnd.setDate(weekEnd.getDate()+7);const week=entries.filter(x=>x.date<=weekEnd);
@@ -82,10 +116,11 @@ function renderCockpit(){
   $('recentPlants').innerHTML=plants.slice(0,5).map(p=>`<div class="p28-item"><div><b>${safe(p.name)}</b><small>${safe(p.species||'Zimmerpflanze')} · ${fmt(p.created_at)}</small></div><button onclick="detail('${p.id}')">Öffnen</button></div>`).join('')||'<div class="p28-empty">Noch keine Pflanzen.</div>';
 }
 window.fertilize=async id=>completeCare(id,'fert');
-async function load(){const r=await db.from('plants').select('*').order('created_at',{ascending:false});if(r.error){alert(r.error.message);return}plants=r.data||[];$('auth').classList.add('hidden');$('app').classList.remove('hidden');$('count').textContent=plants.length;$('water').textContent=plants.filter(p=>due(p.last_watered_at,p.watering_interval_days)).length;$('fert').textContent=plants.filter(p=>due(p.last_fertilized_at,p.fertilizing_interval_days)).length;const u=(await db.auth.getUser()).data.user,h=await db.from('plant_health_logs').select('plant_id').eq('user_id',u.id);$('issues').textContent=new Set((h.data||[]).map(x=>x.plant_id)).size;$('welcome').textContent=plants.length?`${plants.length} Pflanzen · bleib dran, sie wachsen mit dir.`:'Lege deine erste Pflanze an.';
+async function load(){const r=await db.from('plants').select('*').order('created_at',{ascending:false});if(r.error){alert(r.error.message);return}plants=r.data||[];const u=(await db.auth.getUser()).data.user;if(u){window.plantyUserId=u.id;await migrateLocalJournal();await loadCareHistory();await loadCalendarExtras();}$('auth').classList.add('hidden');$('app').classList.remove('hidden');$('count').textContent=plants.length;$('water').textContent=plants.filter(p=>due(p.last_watered_at,p.watering_interval_days)).length;$('fert').textContent=plants.filter(p=>due(p.last_fertilized_at,p.fertilizing_interval_days)).length;const u=(await db.auth.getUser()).data.user,h=await db.from('plant_health_logs').select('plant_id').eq('user_id',u.id);$('issues').textContent=new Set((h.data||[]).map(x=>x.plant_id)).size;$('welcome').textContent=plants.length?`${plants.length} Pflanzen · bleib dran, sie wachsen mit dir.`:'Lege deine erste Pflanze an.';
  const u2=(await db.auth.getUser()).data.user; const pc=await db.from('plant_photos').select('id').eq('user_id',u2.id); $('statPhotos').textContent=(pc.data||[]).length; const rooms=[...new Set(plants.map(p=>p.location).filter(Boolean))].sort();if($('filterRoom'))$('filterRoom').innerHTML='<option value="all">Alle Standorte</option>'+rooms.map(r=>`<option>${safe(r)}</option>`).join('');
  const tasks=plants.filter(p=>due(p.last_watered_at,p.watering_interval_days)).map(p=>`<div class="task">💧 <span><b>${safe(p.name)}</b><br><small>Gießen</small></span><button onclick="water('${p.id}')">Gegossen ✓</button></div>`);$('tasks').innerHTML=tasks.length?tasks.slice(0,8).join(''):'<div class="task">♡ Heute ist alles erledigt</div>';
- let html='';for(const p of plants){const ph=(await photosFor(p.id))[0],url=ph?await signed(ph.photo_path):'';const fav=getFavs().has(p.id);html+=`<div class="plant" data-id="${p.id}" onclick="detail('${p.id}')"><button class="fav-btn ${fav?'active':''}" onclick="event.stopPropagation();toggleFavorite('${p.id}')" aria-label="Favorit">${fav?'♥':'♡'}</button><div class="pic">${url?`<img src="${url}" alt="">`:'🌿'}</div><h3>${safe(p.name)}</h3><p>${safe(p.species||'Zimmerpflanze')} · ${safe(p.location||'Kein Standort')}</p>${due(p.last_watered_at,p.watering_interval_days)?'<span class="badge">💧 Gießen fällig</span>':''}</div>`}$('plants').innerHTML=html+`<div class="plant addplant" onclick="openModal()">＋ Pflanze hinzufügen</div>`;applyFilters();renderReminders();renderCockpit();renderActions();renderIntelligence();renderJournal();renderStats();renderCalendar();
+ let html='';for(const p of plants){const ph=(await photosFor(p.id))[0],url=ph?await signed(ph.photo_path):'';const fav=getFavs().has(p.id);html+=`<div class="plant" data-id="${p.id}" onclick="detail('${p.id}')"><button class="fav-btn ${fav?'active':''}" onclick="event.stopPropagation();toggleFavorite('${p.id}')" aria-label="Favorit">${fav?'♥':'♡'}</button><div class="pic">${url?`<img src="${url}" alt="">`:'🌿'}</div><h3>${safe(p.name)}</h3><p>${safe(p.species||'Zimmerpflanze')} · ${safe(p.location||'Kein Standort')}</p>${due(p.last_watered_at,p.watering_interval_days)?'<span class="badge">💧 Gießen fällig</span>':''}</div>`}$('plants').innerHTML=html+`<div class="plant addplant" onclick="openModal()">＋ Pflanze hinzufügen</div>`;applyFilters();renderReminders();renderCockpit();renderActions();renderIntelligence();renderJournal();renderStats();
+  renderCalendar();renderCalendar();
 }
 window.toggleFavorite=id=>{const s=getFavs();s.has(id)?s.delete(id):s.add(id);saveFavs(s);load()};
 window.water=async id=>completeCare(id,'water');
@@ -156,7 +191,7 @@ function renderIntelligence(){
 
 function renderStats(){
   const year=new Date().getFullYear();
-  const journal=getJournal();
+  const journal=careHistory;
   const inYear=journal.filter(x=>new Date(x.created_at).getFullYear()===year);
   const water=inYear.filter(x=>x.type==='water').length;
   const fert=inYear.filter(x=>x.type==='fert').length;
@@ -184,11 +219,12 @@ let calendarFilter='all';
 function localDayKey(d){const x=new Date(d);return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`}
 function calendarEvents(){
   const events=[];
-  for(const x of getJournal()){
+  for(const x of careHistory){
     const p=plants.find(y=>y.id===x.plant_id);
-    events.push({date:x.created_at,type:x.type==='water'?'water':x.type==='fert'?'fert':'skip',icon:x.type==='water'?'💧':x.type==='fert'?'🌱':'⏭️',title:x.label||'Pflegeaktion',plant:p?.name||'Pflanze',note:x.note||''});
+    const type=x.type==='water'?'water':x.type==='fert'?'fert':'skip';
+    events.push({date:x.performed_at||x.created_at,type,icon:type==='water'?'💧':type==='fert'?'🌱':'⏭️',title:type==='water'?'Gießen erledigt':type==='fert'?'Düngen erledigt':'Pflege übersprungen',plant:p?.name||'Pflanze',note:x.note||''});
   }
-  return events;
+  return [...events,...calendarExtraEvents];
 }
 function renderCalendar(){
   const grid=$('calendarGrid'), title=$('calTitle'); if(!grid||!title)return;
