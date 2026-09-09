@@ -1,11 +1,17 @@
 <!doctype html>
 <html lang="de">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Planty V2.7</title><link rel="stylesheet" href="styles.css"></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Planty V2.8 · Pflege-Cockpit</title><link rel="stylesheet" href="styles.css?v=2.8"></head>
 <body>
 <div id="auth"><div class="box"><div class="brand">⌁ PLANTY</div><p>Deine Pflanzen. Deine Pflege.</p><h1 id="title">Willkommen zurück</h1><form id="authForm"><input id="email" type="email" placeholder="E-Mail" required><input id="password" type="password" placeholder="Passwort" minlength="6" required><button id="authBtn">ANMELDEN</button></form><button class="link" id="mode">Noch kein Konto? Registrieren</button><small id="authMsg"></small></div></div>
 <div id="app" class="hidden"><header><div><b>⌁ PLANTY</b><small>Deine Pflanzen. Deine Pflege.</small></div><button class="icon" id="logout" aria-label="Abmelden">↪</button></header>
 <main><p class="eyebrow">DEIN GRÜNES ZUHAUSE</p><div class="titleRow"><div><h1>Deine Pflanzen</h1><p id="welcome"></p></div><strong id="count">0</strong></div>
 <div class="stats"><div>💧<b id="water">0</b><small>Heute gießen</small></div><div>🌱<b id="fert">0</b><small>Bald düngen</small></div><div>🩺<b id="issues">0</b><small>Beobachten</small></div></div>
+<section id="cockpit" class="p28-cockpit">
+<div class="p28-head"><div><div class="p28-kicker">PFLEGE-COCKPIT</div><h2>Dein grüner Überblick</h2><p id="cockpitText">Alles Wichtige auf einen Blick.</p></div><div class="p28-week" id="weekStatus">Diese Woche</div></div>
+<div class="p28-cards"><div class="p28-card"><span>🔴</span><b id="overdueCount">0</b><small>Überfällig</small></div><div class="p28-card"><span>💧</span><b id="todayCount">0</b><small>Heute</small></div><div class="p28-card"><span>📅</span><b id="weekCount">0</b><small>Diese Woche</small></div><div class="p28-card"><span>📸</span><b id="photoCount">0</b><small>Fotos</small></div></div>
+<div class="p28-columns"><div><div class="p28-section-title">🗓 Pflegeplan</div><div id="carePlan" class="p28-list"></div></div><div><div class="p28-section-title">👀 Aufmerksamkeit</div><div id="attentionList" class="p28-list"></div></div></div>
+<div class="p28-columns"><div><div class="p28-section-title">🏠 Standorte</div><div id="roomSummary" class="p28-room-grid"></div></div><div><div class="p28-section-title">🌿 Zuletzt hinzugefügt</div><div id="recentPlants" class="p28-list"></div></div></div>
+</section>
 <section id="p25-reminder-panel" class="p25-panel"></section>
 <h2>Heute zu tun</h2><div id="tasks"></div>
 <div class="secthead"><h2>Deine Pflanzen</h2><button class="link" id="add">＋ Hinzufügen</button></div>
@@ -17,5 +23,5 @@
 <div id="detail" class="modal hidden"><div class="sheet"><div class="secthead"><h2 id="detailName"></h2><button class="close" id="detailClose">×</button></div><div id="detailBody"></div></div></div>
 <div id="photoModal" class="modal hidden"><div class="sheet"><div class="secthead"><h2>Wachstum dokumentieren</h2><button class="close" id="photoClose">×</button></div><form id="photoForm"><label>Foto</label><input id="growthPhoto" type="file" accept="image/*" capture="environment" required><label>Notiz</label><input id="growthNote" placeholder="z. B. neues Blatt"><button class="primary">Foto speichern</button><small id="photoMsg"></small></form></div></div>
 <div id="healthModal" class="modal hidden"><div class="sheet"><div class="secthead"><h2>Gesundheitsnotiz</h2><button class="close" id="healthClose">×</button></div><form id="healthForm"><select id="problem"><option>Gelbe Blätter</option><option>Schädlinge</option><option>Trockene Blätter</option><option>Wurzelfäule</option><option>Wachstumsproblem</option><option>Beobachtung</option><option>Sonstiges</option></select><select id="severity"><option>Niedrig</option><option selected>Mittel</option><option>Hoch</option></select><textarea id="description" placeholder="Was ist dir aufgefallen?"></textarea><button class="primary">Eintrag speichern</button><small id="healthMsg"></small></form></div></div>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="plant-database.js"></script><script src="app.js"></script>
-<div class="version">Planty V2.7 · Pflanzen-Tagebuch</div></body></html>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="plant-database.js?v=2.8"></script><script src="app.js?v=2.8"></script>
+<div class="version">Planty V2.8 · Pflege-Cockpit</div></body></html>
