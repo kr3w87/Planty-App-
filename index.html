@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="de">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Planty V2.8 · Pflege-Cockpit</title><link rel="stylesheet" href="styles.css?v=2.8"></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Planty V2.9 · Intelligente Pflege</title><link rel="stylesheet" href="styles.css?v=2.8"></head>
 <body>
 <div id="auth"><div class="box"><div class="brand">⌁ PLANTY</div><p>Deine Pflanzen. Deine Pflege.</p><h1 id="title">Willkommen zurück</h1><form id="authForm"><input id="email" type="email" placeholder="E-Mail" required><input id="password" type="password" placeholder="Passwort" minlength="6" required><button id="authBtn">ANMELDEN</button></form><button class="link" id="mode">Noch kein Konto? Registrieren</button><small id="authMsg"></small></div></div>
 <div id="app" class="hidden"><header><div><b>⌁ PLANTY</b><small>Deine Pflanzen. Deine Pflege.</small></div><button class="icon" id="logout" aria-label="Abmelden">↪</button></header>
@@ -12,7 +12,7 @@
 <div class="p28-columns"><div><div class="p28-section-title">🗓 Pflegeplan</div><div id="carePlan" class="p28-list"></div></div><div><div class="p28-section-title">👀 Aufmerksamkeit</div><div id="attentionList" class="p28-list"></div></div></div>
 <div class="p28-columns"><div><div class="p28-section-title">🏠 Standorte</div><div id="roomSummary" class="p28-room-grid"></div></div><div><div class="p28-section-title">🌿 Zuletzt hinzugefügt</div><div id="recentPlants" class="p28-list"></div></div></div>
 </section>
-<section id="p25-reminder-panel" class="p25-panel"></section>
+<section id="p29-actions" class="p29-actions"><div class="p29-head"><div><div class="p28-kicker">HEUTE</div><h2>Pflegeaktionen</h2><p>Mit einem Klick erledigen – der nächste Termin wird automatisch berechnet.</p></div></div><div id="actionList" class="p29-action-list"></div></section><section id="p25-reminder-panel" class="p25-panel"></section>
 <h2>Heute zu tun</h2><div id="tasks"></div>
 <div class="secthead"><h2>Deine Pflanzen</h2><button class="link" id="add">＋ Hinzufügen</button></div>
 <div id="overviewTools" class="p24-overview-tools"><div class="p24-tool-title">🌿 Meine Pflanzen</div><input id="filterInput" type="search" placeholder="Pflanzen suchen …" aria-label="Pflanzen suchen"><select id="filterStatus" aria-label="Pflanzen filtern"><option value="all">Alle Pflanzen</option><option value="water">Bald gießen</option><option value="fert">Bald düngen</option><option value="health">Mit Gesundheitsnotiz</option><option value="fav">♥ Favoriten</option></select><select id="filterRoom" aria-label="Nach Standort filtern"><option value="all">Alle Standorte</option></select></div>
@@ -24,4 +24,4 @@
 <div id="photoModal" class="modal hidden"><div class="sheet"><div class="secthead"><h2>Wachstum dokumentieren</h2><button class="close" id="photoClose">×</button></div><form id="photoForm"><label>Foto</label><input id="growthPhoto" type="file" accept="image/*" capture="environment" required><label>Notiz</label><input id="growthNote" placeholder="z. B. neues Blatt"><button class="primary">Foto speichern</button><small id="photoMsg"></small></form></div></div>
 <div id="healthModal" class="modal hidden"><div class="sheet"><div class="secthead"><h2>Gesundheitsnotiz</h2><button class="close" id="healthClose">×</button></div><form id="healthForm"><select id="problem"><option>Gelbe Blätter</option><option>Schädlinge</option><option>Trockene Blätter</option><option>Wurzelfäule</option><option>Wachstumsproblem</option><option>Beobachtung</option><option>Sonstiges</option></select><select id="severity"><option>Niedrig</option><option selected>Mittel</option><option>Hoch</option></select><textarea id="description" placeholder="Was ist dir aufgefallen?"></textarea><button class="primary">Eintrag speichern</button><small id="healthMsg"></small></form></div></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="plant-database.js?v=2.8"></script><script src="app.js?v=2.8"></script>
-<div class="version">Planty V2.8 · Pflege-Cockpit</div></body></html>
+<div class="version">Planty V2.9 · Intelligente Pflege</div></body></html>

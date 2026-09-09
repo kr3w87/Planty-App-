@@ -51,6 +51,26 @@ function careEntries(){
 }
 function careState(d){const n=new Date(),t=new Date(n);t.setHours(23,59,59,999);const tomorrow=new Date(t);tomorrow.setDate(tomorrow.getDate()+1);if(d<n)return 'overdue';if(d<=t)return 'today';return 'soon'}
 function careLabel(x){const s=careState(x.date);if(s==='overdue')return 'Überfällig';if(s==='today')return 'Heute';return fmt(x.date)}
+function actionDate(p,type){return type==='water'?days(p.last_watered_at,p.watering_interval_days):days(p.last_fertilized_at,p.fertilizing_interval_days)}
+function actionEntries(){return careEntries().filter(x=>careState(x.date)!=='soon'||x.date<=new Date(Date.now()+7*86400000)).slice(0,30)}
+function renderActions(){
+  const list=$('actionList'); if(!list)return;
+  const entries=actionEntries();
+  list.innerHTML=entries.length?entries.map(x=>{const state=careState(x.date);return `<div class="p29-action ${state}"><div class="p29-action-main"><span class="p29-icon">${x.icon}</span><div><b>${safe(x.plant.name)} · ${x.label}</b><small>${state==='overdue'?'Überfällig seit '+fmt(x.date):state==='today'?'Heute fällig':'Fällig am '+fmt(x.date)}</small></div></div><div class="p29-buttons"><button class="primary-action" onclick="completeCare('${x.plant.id}','${x.type}')">✓ Erledigt</button><button onclick="skipCare('${x.plant.id}','${x.type}')">Überspringen</button></div></div>`}).join(''):'<div class="p29-empty">🎉 Keine offenen Pflegeaktionen. Deine Pflanzen sind im Plan.</div>';
+}
+window.completeCare=async(id,type)=>{
+ const field=type==='water'?'last_watered_at':'last_fertilized_at';
+ const r=await db.from('plants').update({[field]:new Date().toISOString()}).eq('id',id);
+ if(r.error)alert(r.error.message);else load();
+};
+window.skipCare=async(id,type)=>{
+ const p=plants.find(x=>x.id===id); if(!p)return;
+ const interval=type==='water'?p.watering_interval_days:p.fertilizing_interval_days;
+ const field=type==='water'?'last_watered_at':'last_fertilized_at';
+ const base=actionDate(p,type)||new Date(); const next=new Date(base); next.setDate(next.getDate()+Number(interval||7));
+ const r=await db.from('plants').update({[field]:next.toISOString()}).eq('id',id);
+ if(r.error)alert(r.error.message);else load();
+};
 function renderCockpit(){
   const entries=careEntries(), overdue=entries.filter(x=>careState(x.date)==='overdue'), today=entries.filter(x=>careState(x.date)==='today');
   const weekEnd=new Date();weekEnd.setDate(weekEnd.getDate()+7);const week=entries.filter(x=>x.date<=weekEnd);
@@ -69,7 +89,7 @@ window.fertilize=async id=>{const r=await db.from('plants').update({last_fertili
 async function load(){const r=await db.from('plants').select('*').order('created_at',{ascending:false});if(r.error){alert(r.error.message);return}plants=r.data||[];$('auth').classList.add('hidden');$('app').classList.remove('hidden');$('count').textContent=plants.length;$('water').textContent=plants.filter(p=>due(p.last_watered_at,p.watering_interval_days)).length;$('fert').textContent=plants.filter(p=>due(p.last_fertilized_at,p.fertilizing_interval_days)).length;const u=(await db.auth.getUser()).data.user,h=await db.from('plant_health_logs').select('plant_id').eq('user_id',u.id);$('issues').textContent=new Set((h.data||[]).map(x=>x.plant_id)).size;$('welcome').textContent=plants.length?`${plants.length} Pflanzen · bleib dran, sie wachsen mit dir.`:'Lege deine erste Pflanze an.';
  const rooms=[...new Set(plants.map(p=>p.location).filter(Boolean))].sort();if($('filterRoom'))$('filterRoom').innerHTML='<option value="all">Alle Standorte</option>'+rooms.map(r=>`<option>${safe(r)}</option>`).join('');
  const tasks=plants.filter(p=>due(p.last_watered_at,p.watering_interval_days)).map(p=>`<div class="task">💧 <span><b>${safe(p.name)}</b><br><small>Gießen</small></span><button onclick="water('${p.id}')">Gegossen ✓</button></div>`);$('tasks').innerHTML=tasks.length?tasks.slice(0,8).join(''):'<div class="task">♡ Heute ist alles erledigt</div>';
- let html='';for(const p of plants){const ph=(await photosFor(p.id))[0],url=ph?await signed(ph.photo_path):'';const fav=getFavs().has(p.id);html+=`<div class="plant" data-id="${p.id}" onclick="detail('${p.id}')"><button class="fav-btn ${fav?'active':''}" onclick="event.stopPropagation();toggleFavorite('${p.id}')" aria-label="Favorit">${fav?'♥':'♡'}</button><div class="pic">${url?`<img src="${url}" alt="">`:'🌿'}</div><h3>${safe(p.name)}</h3><p>${safe(p.species||'Zimmerpflanze')} · ${safe(p.location||'Kein Standort')}</p>${due(p.last_watered_at,p.watering_interval_days)?'<span class="badge">💧 Gießen fällig</span>':''}</div>`}$('plants').innerHTML=html+`<div class="plant addplant" onclick="openModal()">＋ Pflanze hinzufügen</div>`;applyFilters();renderReminders();renderCockpit();
+ let html='';for(const p of plants){const ph=(await photosFor(p.id))[0],url=ph?await signed(ph.photo_path):'';const fav=getFavs().has(p.id);html+=`<div class="plant" data-id="${p.id}" onclick="detail('${p.id}')"><button class="fav-btn ${fav?'active':''}" onclick="event.stopPropagation();toggleFavorite('${p.id}')" aria-label="Favorit">${fav?'♥':'♡'}</button><div class="pic">${url?`<img src="${url}" alt="">`:'🌿'}</div><h3>${safe(p.name)}</h3><p>${safe(p.species||'Zimmerpflanze')} · ${safe(p.location||'Kein Standort')}</p>${due(p.last_watered_at,p.watering_interval_days)?'<span class="badge">💧 Gießen fällig</span>':''}</div>`}$('plants').innerHTML=html+`<div class="plant addplant" onclick="openModal()">＋ Pflanze hinzufügen</div>`;applyFilters();renderReminders();renderCockpit();renderActions();
 }
 window.toggleFavorite=id=>{const s=getFavs();s.has(id)?s.delete(id):s.add(id);saveFavs(s);load()};
 window.water=async id=>{const r=await db.from('plants').update({last_watered_at:new Date().toISOString()}).eq('id',id);if(r.error)alert(r.error.message);else load()};
