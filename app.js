@@ -3,6 +3,7 @@ const SUPABASE_PUBLISHABLE_KEY="sb_publishable_NbJQhCF0GKDljAB2cOxhpw_Lva2P51L";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);
 let signup=false,current=null,plants=[],careHistory=[],calendarExtraEvents=[];
 let loading=false;
+let selectedRoom=null,roomPlantId=null;
 let authReady=false;
 const $=id=>document.getElementById(id);
 const safe=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
@@ -162,6 +163,7 @@ async function load(){
     $('statPhotos').textContent=(pc.data||[]).length;
     const rooms=[...new Set(plants.map(p=>p.location).filter(Boolean))].sort();
     if($('filterRoom')) $('filterRoom').innerHTML='<option value="all">Alle Standorte</option>'+rooms.map(r=>`<option>${safe(r)}</option>`).join('');
+    renderRooms();
     const tasks=plants.filter(p=>due(p.last_watered_at,p.watering_interval_days)).map(p=>`<div class="task">💧 <span><b>${safe(p.name)}</b><br><small>Gießen</small></span><button onclick="water('${p.id}')">Gegossen ✓</button></div>`);
     $('tasks').innerHTML=tasks.length?tasks.slice(0,8).join(''):'<div class="task">♡ Heute ist alles erledigt</div>';
     let html='';
@@ -187,10 +189,10 @@ $('plantForm').onsubmit=async e=>{e.preventDefault();const c=catalog[+$('plantTy
 window.detail=async id=>{current=plants.find(p=>p.id===id);if(!current)return;$('detailName').textContent=current.name;const [ps,hs]=await Promise.all([photosFor(id),healthFor(id)]);const urls=await Promise.all(ps.map(p=>signed(p.photo_path)));const fav=getFavs().has(id);const first=ps.length?new Date(ps[ps.length-1].taken_at):null,last=ps.length?new Date(ps[0].taken_at):null;const span=first&&last?Math.max(0,Math.round((last-first)/86400000)):0;const waterDue=due(current.last_watered_at,current.watering_interval_days);const fertDue=due(current.last_fertilized_at,current.fertilizing_interval_days);const logs=journalFor(id).slice(0,20);$('detailBody').innerHTML=`
 <div class="plant-detail-head"><div class="plant-detail-avatar">${ps.length?`<img src="${urls[0]}" alt="">`:'🌿'}</div><div class="plant-detail-title"><span>${safe(current.species||'Zimmerpflanze')}</span><strong>${safe(current.location||'Kein Standort')}</strong><small>${safe(current.health_status||'Gut')}</small></div><button class="fav-large" onclick="toggleFavorite('${id}')">${fav?'♥ Favorit':'♡ Favorit'}</button></div>
 <div class="detail-metrics"><div><b>${waterDue?'💧 Heute':'💧 '+fmt(nextDate(current.last_watered_at,current.watering_interval_days))}</b><small>Gießen</small></div><div><b>${fertDue?'🌱 Bald':'🌱 '+fmt(nextDate(current.last_fertilized_at,current.fertilizing_interval_days))}</b><small>Düngen</small></div><div><b>📸 ${ps.length}</b><small>Fotos</small></div><div><b>🩺 ${hs.length}</b><small>Beobachtungen</small></div></div>
-<div class="detail-actions"><button class="primary-action" onclick="water('${id}')">💧 Gegossen</button><button onclick="fertilize('${id}')">🌱 Gedüngt</button><button onclick="openPhoto('${id}')">📸 Foto</button><button onclick="openHealth('${id}')">🩺 Beobachtung</button><button onclick="openLightMeter('${id}')">☀️ Licht messen</button></div>
+<div class="detail-actions"><button class="primary-action" onclick="water('${id}')">💧 Gegossen</button><button onclick="fertilize('${id}')">🌱 Gedüngt</button><button onclick="openPhoto('${id}')">📸 Foto</button><button onclick="openHealth('${id}')">🩺 Gesundheitscheck</button><button onclick="openLightMeter('${id}')">☀️ Licht messen</button><button onclick="openRoomManager('${id}')">🏠 Standort</button></div>
 <div class="p31-detail-card detail-recommendation"><b>🧠 Pflegeempfehlung</b><small>${safe(seasonInfo().text)}</small><div><span>💧</span> Nächstes Gießen: <strong>${fmt(intelligentDue(current,'water'))}</strong> · ${intelligentInterval(current,'water')} Tage</div><div><span>🌱</span> Nächstes Düngen: <strong>${fmt(intelligentDue(current,'fert'))}</strong> · ${intelligentInterval(current,'fert')} Tage</div></div>
 <div class="detail-tabs"><button class="detail-tab active" data-detail-tab="overview">Übersicht</button><button class="detail-tab" data-detail-tab="history">Verlauf</button><button class="detail-tab" data-detail-tab="photos">Fotos</button><button class="detail-tab" data-detail-tab="health">Gesundheit</button></div>
-<div class="detail-tab-panel active" data-detail-panel="overview"><div class="detail-info-grid"><div><small>Lichtbedarf</small><b>☀️ ${safe(current.light_level||'—')}</b></div><div><small>Gießintervall</small><b>💧 ${current.watering_interval_days||'—'} Tage</b></div><div><small>Düngeintervall</small><b>🌱 ${current.fertilizing_interval_days||'—'} Tage</b></div><div><small>Dokumentiert</small><b>🌿 ${span} Tage</b></div></div><div id="detailLightBox" class="detail-light-box">${lightSummary(id,current)}</div><h3>📝 Notizen</h3><div class="health">${safe(current.notes||'Keine Notizen.')}</div></div>
+<div class="detail-tab-panel active" data-detail-panel="overview"><div class="detail-info-grid"><div><small>Lichtbedarf</small><b>☀️ ${safe(current.light_level||'—')}</b></div><div><small>Gießintervall</small><b>💧 ${current.watering_interval_days||'—'} Tage</b></div><div><small>Düngeintervall</small><b>🌱 ${current.fertilizing_interval_days||'—'} Tage</b></div><div><small>Dokumentiert</small><b>🌿 ${span} Tage</b></div></div><div id="detailLightBox" class="detail-light-box">${lightSummary(id,current)}</div><div class="p38-personal"><div><b>📊 Deine Pflegeintelligenz</b><small>${safe(intelligenceReason(current,'water'))}</small></div><span>${safe(intelligenceSource(current,'water'))}</span></div><h3>📝 Notizen</h3><div class="health">${safe(current.notes||'Keine Notizen.')}</div></div>
 <div class="detail-tab-panel" data-detail-panel="history"><h3>📖 Pflegeverlauf</h3>${logs.map(x=>`<div class="health"><b>${x.type==='water'?'💧':x.type==='fert'?'🌱':'⏭️'} ${safe(x.label||'Pflegeaktion')}</b><small>${fmt(x.created_at)}${x.note?' · '+safe(x.note):''}</small></div>`).join('')||'<div class="empty-state">Noch keine Pflegeaktionen.</div>'}</div>
 <div class="detail-tab-panel" data-detail-panel="photos"><h3>📸 Fotoalbum</h3>${ps.length?`<div class="photos">${ps.map((x,i)=>`<div class="photo"><img src="${urls[i]}" alt=""><small>${fmt(x.taken_at)}${x.note?' · '+safe(x.note):''}</small></div>`).join('')}</div><h3>🌱 Wachstumsverlauf</h3><div class="timeline">${ps.map((x,i)=>`<div class="timeline-item"><div class="timeline-dot">🌿</div><div class="timeline-card"><img src="${urls[i]}" alt=""><div><b>${fmt(x.taken_at)}</b><small>${safe(x.note||'Wachstumsfoto')}</small></div></div></div>`).join('')}</div>`:'<div class="empty-state">Mach regelmäßig Fotos – so entsteht automatisch deine Zeitlinie.</div>'}</div>
 <div class="detail-tab-panel" data-detail-panel="health"><h3>🩺 Beobachtungen</h3>${hs.length?hs.map(h=>`<div class="health"><b>${safe(h.problem||'Beobachtung')}</b> · <span class="badge">${safe(h.severity||'Mittel')}</span><br>${safe(h.description||'')}<small>${fmt(h.created_at)}</small></div>`).join(''):'<div class="empty-state">Keine Beobachtungen eingetragen.</div>'}</div>`;
@@ -198,8 +200,8 @@ document.querySelectorAll('[data-detail-tab]').forEach(btn=>btn.onclick=()=>{doc
 $('detailClose').onclick=()=>$('detail').classList.add('hidden');
 window.openPhoto=id=>{current=plants.find(p=>p.id===id);$('photoForm').reset();$('photoModal').classList.remove('hidden')};$('photoClose').onclick=()=>$('photoModal').classList.add('hidden');
 $('photoForm').onsubmit=async e=>{e.preventDefault();if(!current)return;const f=$('growthPhoto').files[0],u=(await db.auth.getUser()).data.user;if(!f)return;const ext=(f.name.split('.').pop()||'jpg').toLowerCase().replace(/[^a-z0-9]/g,'')||'jpg',now=new Date().toISOString(),path=`${u.id}/${current.id}/${crypto.randomUUID()}.${ext}`,up=await db.storage.from('plant-photos').upload(path,f,{contentType:f.type||'image/jpeg'});if(up.error){$('photoMsg').textContent=up.error.message;return}const r=await db.from('plant_photos').insert({plant_id:current.id,user_id:u.id,photo_path:path,note:$('growthNote').value.trim()||'Wachstumsfoto',taken_at:now});if(r.error){$('photoMsg').textContent=r.error.message;return}$('photoModal').classList.add('hidden');detail(current.id);load()};
-window.openHealth=id=>{current=plants.find(p=>p.id===id);$('healthForm').reset();$('healthModal').classList.remove('hidden')};$('healthClose').onclick=()=>$('healthModal').classList.add('hidden');
-$('healthForm').onsubmit=async e=>{e.preventDefault();const u=(await db.auth.getUser()).data.user,r=await db.from('plant_health_logs').insert({plant_id:current.id,user_id:u.id,problem:$('problem').value,severity:$('severity').value,description:$('description').value.trim()});if(r.error){$('healthMsg').textContent=r.error.message;return}$('healthModal').classList.add('hidden');detail(current.id);load()};
+window.openHealth=id=>{current=plants.find(x=>x.id===id);if(!current)return;$('healthForm').reset();$('healthMsg').textContent='';$('healthModal').classList.remove('hidden')};$('healthClose').onclick=()=>$('healthModal').classList.add('hidden');
+$('healthForm').onsubmit=async e=>{e.preventDefault();if(!current)return;const u=(await db.auth.getUser()).data.user,leaves=$('checkLeaves').value,pests=$('checkPests').value,stems=$('checkStems').value,soil=$('checkSoil').value,overall=$('checkOverall').value,issues=[];if(leaves!=='ok')issues.push($('checkLeaves').selectedOptions[0].text);if(pests!=='none')issues.push($('checkPests').selectedOptions[0].text);if(stems!=='ok')issues.push($('checkStems').selectedOptions[0].text);if(soil!=='normal')issues.push($('checkSoil').selectedOptions[0].text);const severity=overall==='problem'||pests==='yes'||stems==='soft'?'Hoch':overall==='watch'||issues.length?'Mittel':'Niedrig',problem=issues.length?issues.join(', '):'Gesundheitscheck – unauffällig',desc=$('description').value.trim()||(issues.length?'Check: '+issues.join(' · '):'Alle geprüften Punkte unauffällig.'),r=await db.from('plant_health_logs').insert({plant_id:current.id,user_id:u.id,problem,severity,description:desc});if(r.error){$('healthMsg').textContent=r.error.message;return}const status=overall==='good'&&!issues.length?'Gut':severity==='Hoch'?'Problem':'Beobachten',up=await db.from('plants').update({health_status:status}).eq('id',current.id);if(up.error){$('healthMsg').textContent=up.error.message;return}$('healthModal').classList.add('hidden');await detail(current.id);load()};
 $('filterInput').oninput=applyFilters;$('filterStatus').onchange=applyFilters;$('filterRoom').onchange=applyFilters;
 
 function seasonInfo(){
@@ -209,20 +211,32 @@ function seasonInfo(){
   if([6,7,8].includes(m))return {name:'Sommer',emoji:'☀️',factor:.86,text:'Mehr Licht und Wärme: Wasserbedarf kann steigen.'};
   return {name:'Herbst',emoji:'🍂',factor:1.10,text:'Licht nimmt ab: Intervalle vorsichtiger planen.'};
 }
+function careIntervalsFor(p,type){
+  const rows=careHistory.filter(x=>x.plant_id===p.id&&x.type===type).map(x=>new Date(x.performed_at||x.created_at)).filter(d=>!isNaN(d)).sort((a,b)=>a-b);
+  const gaps=[]; for(let i=1;i<rows.length;i++){const g=Math.round((rows[i]-rows[i-1])/86400000); if(g>=1&&g<=120)gaps.push(g)}
+  return gaps;
+}
+function median(nums){if(!nums.length)return null;const a=[...nums].sort((x,y)=>x-y),m=Math.floor(a.length/2);return a.length%2?a[m]:Math.round((a[m-1]+a[m])/2)}
+function personalizedData(p,type){
+  const gaps=careIntervalsFor(p,type), observed=median(gaps);
+  const catalog=Number(type==='water'?p.watering_interval_days:p.fertilizing_interval_days)||7;
+  if(observed==null)return {interval:null,observed:null,samples:0,gaps:[],confidence:'noch keine Daten'};
+  const blend=gaps.length>=5?.7:.55;
+  return {interval:Math.round(observed*blend+catalog*(1-blend)),observed,samples:gaps.length+1,gaps,confidence:gaps.length>=5?'hoch':gaps.length>=2?'mittel':'gering'};
+}
 function intelligentInterval(p,type){
   const base=Number(type==='water'?p.watering_interval_days:p.fertilizing_interval_days)||7;
-  const s=seasonInfo();
-  let factor=s.factor;
+  const personal=personalizedData(p,type);
+  const s=seasonInfo(); let factor=s.factor;
   const light=String(p.light_level||'').toLowerCase();
   if(type==='water'){
     if(light.includes('hell')||light.includes('direkt'))factor*=.96;
     if(light.includes('schatt')||light.includes('wenig'))factor*=1.06;
   } else {
-    // In winter/low-light periods, fertilizing is intentionally reduced.
-    if(s.name==='Winter')factor*=1.45;
-    else if(s.name==='Sommer')factor*=.95;
+    if(s.name==='Winter')factor*=1.45; else if(s.name==='Sommer')factor*=.95;
   }
-  return Math.max(type==='water'?2:7,Math.round(base*factor));
+  const reference=personal.interval??base;
+  return Math.max(type==='water'?2:7,Math.round(reference*factor));
 }
 function intelligentDue(p,type){
   const field=type==='water'?'last_watered_at':'last_fertilized_at';
@@ -230,16 +244,22 @@ function intelligentDue(p,type){
   return days(d,intelligentInterval(p,type));
 }
 function intelligenceReason(p,type){
-  const s=seasonInfo(), light=String(p.light_level||'nicht angegeben').toLowerCase();
-  if(type==='water'){
-    if(s.name==='Sommer')return 'Sommer + Licht können den Wasserbedarf erhöhen.';
-    if(s.name==='Winter')return 'Weniger Licht im Winter: Planty plant bewusst vorsichtiger.';
-    if(light.includes('schatt')||light.includes('wenig'))return 'Wenig Licht: Planty verlängert das Intervall leicht.';
-    return 'Intervall an Jahreszeit und Licht angepasst.';
+  const s=seasonInfo(), light=String(p.light_level||'nicht angegeben').toLowerCase(), pd=personalizedData(p,type);
+  if(pd.observed!=null){
+    const diff=pd.observed-(Number(type==='water'?p.watering_interval_days:p.fertilizing_interval_days)||7);
+    const trend=diff<=-2?'du hast zuletzt etwas häufiger':diff>=2?'du hast zuletzt etwas seltener':'du hast zuletzt ähnlich';
+    return `${trend} ${type==='water'?'gegossen':'gedüngt'} (Median ${pd.observed} Tage, ${pd.samples} Vorgänge).`;
   }
-  if(s.name==='Winter')return 'Im Winter wird Düngen deutlich zurückgenommen.';
-  return 'Düngen wird saisonal und nach dem hinterlegten Intervall geplant.';
+  if(type==='water'){
+    if(s.name==='Sommer')return 'Noch keine persönliche Historie: Sommer + Licht werden vorsichtig berücksichtigt.';
+    if(s.name==='Winter')return 'Noch keine persönliche Historie: Weniger Licht im Winter wird vorsichtig berücksichtigt.';
+    if(light.includes('schatt')||light.includes('wenig'))return 'Noch keine persönliche Historie: Wenig Licht verlängert das Intervall leicht.';
+    return 'Noch keine persönliche Historie: Planty startet mit dem Pflanzenprofil.';
+  }
+  if(s.name==='Winter')return 'Noch keine persönliche Historie: Im Winter wird Düngen deutlich zurückgenommen.';
+  return 'Noch keine persönliche Historie: Planty startet mit dem hinterlegten Düngeintervall.';
 }
+function intelligenceSource(p,type){const d=personalizedData(p,type);return d.observed!=null?`📊 Eigene Daten · ${d.confidence}`:'🌿 Pflanzenprofil · noch keine persönlichen Daten';}
 function renderIntelligence(){
   const box=$('intelligenceList'); if(!box)return;
   const s=seasonInfo(); $('seasonBadge').textContent=`${s.emoji} ${s.name}`;
@@ -251,7 +271,7 @@ function renderIntelligence(){
   const visible=all.slice(0,8);
   box.innerHTML=visible.length?visible.map(x=>{
     const late=x.date<new Date(), today=careState(x.date)==='today';
-    return `<div class="p31-item ${late?'late':''}"><div class="p31-icon">${x.icon}</div><div class="p31-main"><b>${safe(x.p.name)} · ${x.label}</b><small>${late?'Überfällig':today?'Heute empfohlen':'Empfohlen am '+fmt(x.date)} · Intervall ${x.interval} Tage</small><span>${safe(x.reason)}</span></div><button onclick="detail('${x.p.id}')">Details</button></div>`
+    return `<div class="p31-item ${late?'late':''}"><div class="p31-icon">${x.icon}</div><div class="p31-main"><b>${safe(x.p.name)} · ${x.label}</b><small>${late?'Überfällig':today?'Heute empfohlen':'Empfohlen am '+fmt(x.date)} · Intervall ${x.interval} Tage</small><span>${safe(x.reason)}</span><em class="p31-source">${safe(intelligenceSource(x.p,x.type))}</em></div><button onclick="detail('${x.p.id}')">Details</button></div>`
   }).join(''):`<div class="p31-empty">Noch keine Pflanzen für eine Empfehlung vorhanden.</div>`;
 }
 
@@ -321,6 +341,19 @@ $('calPrev')?.addEventListener('click',()=>{calendarDate.setMonth(calendarDate.g
 $('calNext')?.addEventListener('click',()=>{calendarDate.setMonth(calendarDate.getMonth()+1);renderCalendar()});
 document.querySelectorAll('.p33-filter').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('.p33-filter').forEach(x=>x.classList.remove('active'));b.classList.add('active');calendarFilter=b.dataset.calFilter;renderCalendar()}));
 
+function roomKey(){return `planty:rooms:${window.plantyUserId||'user'}`}
+function savedRooms(){try{return JSON.parse(localStorage.getItem(roomKey())||'[]')}catch{return[]}}
+function saveRooms(list){localStorage.setItem(roomKey(),JSON.stringify([...new Set(list.filter(Boolean).map(x=>String(x).trim()))].sort((a,b)=>a.localeCompare(b,'de'))))}
+function roomNames(){return [...new Set([...savedRooms(),...plants.map(p=>(p.location||'').trim()).filter(Boolean)])].sort((a,b)=>a.localeCompare(b,'de'))}
+function renderRooms(){const cards=$('roomCards');if(!cards)return;const rooms=roomNames();if(selectedRoom&&!rooms.includes(selectedRoom))selectedRoom=null;if(!selectedRoom&&rooms.length)selectedRoom=rooms[0];cards.innerHTML=rooms.map(r=>{const ps=plants.filter(p=>(p.location||'').trim()===r),issues=ps.filter(p=>p.health_status&&p.health_status!=='Gut').length,dueN=ps.filter(p=>due(p.last_watered_at,p.watering_interval_days)||due(p.last_fertilized_at,p.fertilizing_interval_days)).length;return `<button class="p39-room-card ${selectedRoom===r?'active':''}" onclick="selectRoom('${safe(r).replace(/'/g,"&#039;")}')"><span>🏠</span><b>${safe(r)}</b><small>${ps.length} ${ps.length===1?'Pflanze':'Pflanzen'} · ${dueN} fällig</small>${issues?`<em>🩺 ${issues} beobachten</em>`:''}</button>`}).join('')||'<div class="p39-empty">Noch keine Räume. Lege einen Raum an oder ordne eine Pflanze einem Standort zu.</div>';renderRoomPlants()}
+window.selectRoom=r=>{selectedRoom=r;renderRooms()};
+function renderRoomPlants(){const box=$('roomPlants');if(!box)return;if(!selectedRoom){box.innerHTML='<div class="p39-empty">Wähle einen Raum aus.</div>';return}const ps=plants.filter(p=>(p.location||'').trim()===selectedRoom);box.innerHTML=`<div class="p39-room-head"><div><b>🏠 ${safe(selectedRoom)}</b><small>${ps.length} Pflanzen</small></div><button onclick="openNewRoom()">＋ Neuer Raum</button></div>`+(ps.length?ps.map(p=>`<div class="p39-room-plant"><div><b>${safe(p.name)}</b><small>${safe(p.species||'Zimmerpflanze')} · ${p.health_status==='Gut'?'🌿 Gut':'🩺 '+safe(p.health_status||'Beobachten')}</small></div><div><button onclick="detail('${p.id}')">Öffnen</button><button onclick="openRoomManager('${p.id}')">Verschieben</button></div></div>`).join(''):'<div class="p39-empty">Keine Pflanzen in diesem Raum.</div>')}
+window.openNewRoom=()=>{roomPlantId=null;$('roomForm').reset();fillRoomSelect();$('roomMsg').textContent='';$('roomModal').classList.remove('hidden')};
+window.openRoomManager=id=>{roomPlantId=id;const p=plants.find(x=>x.id===id);if(!p)return;$('roomForm').reset();fillRoomSelect();$('roomSelect').value=p.location||'';$('roomMsg').textContent='';$('roomModal').classList.remove('hidden')};
+function fillRoomSelect(){const rooms=roomNames();$('roomSelect').innerHTML='<option value="">Ohne Standort</option>'+rooms.map(r=>`<option value="${safe(r)}">${safe(r)}</option>`).join('')}
+$('roomClose').onclick=()=>$('roomModal').classList.add('hidden');$('newRoomBtn').onclick=openNewRoom;
+$('roomForm').onsubmit=async e=>{e.preventDefault();const name=$('newRoomName').value.trim()||$('roomSelect').value;if(roomPlantId){const r=await db.from('plants').update({location:name}).eq('id',roomPlantId);if(r.error){$('roomMsg').textContent=r.error.message;return}$('roomModal').classList.add('hidden');await load();detail(roomPlantId)}else{if(!name){$('roomMsg').textContent='Bitte einen Raumnamen eingeben.';return}saveRooms([...savedRooms(),name]);selectedRoom=name;$('roomModal').classList.add('hidden');renderRooms()}};
+
 const lightKey=uid=>`planty:light:${uid||"user"}`;
 function getLightReadings(){try{return JSON.parse(localStorage.getItem(lightKey(window.plantyUserId))||"{}")}catch{return {}}}
 function saveLightReadings(x){localStorage.setItem(lightKey(window.plantyUserId),JSON.stringify(x))}
@@ -347,6 +380,7 @@ function showPage(page,scroll=true){
   if(page==='calendar'){setTimeout(()=>{if(typeof renderCalendar==='function')renderCalendar()},0)}
   if(page==='journal'){setTimeout(()=>{if(typeof renderJournal==='function')renderJournal()},0)}
   if(page==='stats'){setTimeout(()=>{if(typeof renderStats==='function')renderStats()},0)}
+  if(page==='rooms'){setTimeout(()=>{if(typeof renderRooms==='function')renderRooms()},0)}
   if(scroll)window.scrollTo({top:0,behavior:'smooth'});
 }
 pageButtons.forEach(b=>b.addEventListener('click',()=>showPage(b.dataset.page)));
