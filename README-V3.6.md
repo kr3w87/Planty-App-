@@ -1,6 +1,6 @@
-# Planty V3.6 · Pflanzendetail
+# Planty V3.7 · Pflanzendetail
 
-V3.6 baut auf V3.5 auf und macht die Pflanzendetailansicht kompakter und übersichtlicher.
+V3.7 baut auf V3.5 auf und macht die Pflanzendetailansicht kompakter und übersichtlicher.
 
 ## Neu
 - kompakter Kopf mit Foto, Art, Standort und Favorit
