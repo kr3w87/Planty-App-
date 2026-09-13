@@ -123,6 +123,21 @@ function renderActions(){
 }
 window.completeCare=async(id,type)=>{const p=plants.find(x=>x.id===id);if(!p)return;const field=type==='water'?'last_watered_at':'last_fertilized_at',now=new Date().toISOString();const r=await db.from('plants').update({[field]:now}).eq('id',id);if(r.error){alert(r.error.message);return}await logCare(id,type);await load()};
 window.skipCare=async(id,type)=>{const p=plants.find(x=>x.id===id);if(!p)return;const interval=type==='water'?p.watering_interval_days:p.fertilizing_interval_days;const field=type==='water'?'last_watered_at':'last_fertilized_at';const base=actionDate(p,type)||new Date();const next=new Date(base);next.setDate(next.getDate()+Number(interval||7));const r=await db.from('plants').update({[field]:next.toISOString()}).eq('id',id);if(r.error){alert(r.error.message);return}await logCare(id,'skip',`Neuer Termin ${fmt(next)}`);await load()};
+function renderToday(){
+  const box=$('todayActions'); if(!box)return;
+  const entries=careEntries();
+  const overdue=entries.filter(x=>careState(x.date)==='overdue');
+  const today=entries.filter(x=>careState(x.date)==='today');
+  const health=plants.filter(p=>p.health_status&&p.health_status!=='Gut');
+  const open=[...overdue,...today];
+  $('todayScore').innerHTML=`<b>${open.length+health.length}</b><span>${open.length+health.length===1?'Punkt':'Punkte'}</span>`;
+  $('todayGreeting').textContent=open.length?`${open.length} Pflegeaufgabe${open.length===1?' wartet':'n warten'} auf dich.`:health.length?`${health.length} Pflanze${health.length===1?' braucht':'n brauchen'} einen Blick.`:'Heute ist alles im Plan.';
+  $('todaySummary').innerHTML=`<div><span>💧</span><b>${today.filter(x=>x.type==='water').length}</b><small>heute gießen</small></div><div><span>🌱</span><b>${today.filter(x=>x.type==='fert').length}</b><small>heute düngen</small></div><div><span>🔴</span><b>${overdue.length}</b><small>überfällig</small></div><div><span>🩺</span><b>${health.length}</b><small>beobachten</small></div>`;
+  const rows=open.slice(0,5).map(x=>{const st=careState(x.date);return `<div class="v41-action ${st}"><div class="v41-action-icon">${x.icon}</div><div class="v41-action-main"><b>${safe(x.plant.name)}</b><small>${x.label} · ${st==='overdue'?'überfällig':'heute'}</small></div><button class="primary-action" onclick="${x.type==='water'?`water('${x.plant.id}')`:`fertilize('${x.plant.id}')`}">Erledigt</button><button class="v41-detail" onclick="detail('${x.plant.id}')">›</button></div>`}).join('');
+  const healthRows=health.slice(0,2).map(p=>`<div class="v41-action health"><div class="v41-action-icon">🩺</div><div class="v41-action-main"><b>${safe(p.name)}</b><small>${safe(p.health_status)}</small></div><button class="v41-detail-open" onclick="detail('${p.id}')">Ansehen</button></div>`).join('');
+  box.innerHTML=rows+healthRows||'<div class="v41-empty">🎉 Keine offenen Aufgaben. Deine Pflanzen sind gut versorgt.</div>';
+  const more=$('todayShowAll'); if(more)more.textContent=entries.length>5?'Alle Pflegeaufgaben anzeigen →':'Zur Pflegeübersicht →';
+}
 function renderCockpit(){
   const entries=careEntries(), overdue=entries.filter(x=>careState(x.date)==='overdue'), today=entries.filter(x=>careState(x.date)==='today');
   const weekEnd=new Date();weekEnd.setDate(weekEnd.getDate()+7);const week=entries.filter(x=>x.date<=weekEnd);
@@ -173,7 +188,7 @@ async function load(){
       html+=`<div class="plant" data-id="${p.id}" onclick="detail('${p.id}')"><button class="fav-btn ${fav?'active':''}" onclick="event.stopPropagation();toggleFavorite('${p.id}')" aria-label="Favorit">${fav?'♥':'♡'}</button><div class="pic">${url?`<img src="${url}" alt="">`:'🌿'}</div><h3>${safe(p.name)}</h3><p>${safe(p.species||'Zimmerpflanze')} · ${safe(p.location||'Kein Standort')}</p>${due(p.last_watered_at,p.watering_interval_days)?'<span class="badge">💧 Gießen fällig</span>':''}</div>`;
     }
     $('plants').innerHTML=html+`<div class="plant addplant" onclick="openModal()">＋ Pflanze hinzufügen</div>`;
-    applyFilters(); renderReminders(); renderCockpit(); renderActions(); renderIntelligence(); renderJournal(); renderStats(); renderCalendar();
+    applyFilters(); renderReminders(); renderToday(); renderCockpit(); renderActions(); renderIntelligence(); renderJournal(); renderStats(); renderCalendar();
   } catch(e){
     auth('Fehler beim Laden: '+(e?.message||e));
   } finally { loading=false; }
