@@ -138,6 +138,7 @@ function renderCockpit(){
   $('recentPlants').innerHTML=plants.slice(0,5).map(p=>`<div class="p28-item"><div><b>${safe(p.name)}</b><small>${safe(p.species||'Zimmerpflanze')} · ${fmt(p.created_at)}</small></div><button onclick="detail('${p.id}')">Öffnen</button></div>`).join('')||'<div class="p28-empty">Noch keine Pflanzen.</div>';
 }
 window.fertilize=async id=>completeCare(id,'fert');
+function renderV45Quick(){const pc=$('p45PlantCount'),dc=$('p45DueCount'),rc=$('p45RoomCount');if(pc)pc.textContent=plants.length;if(dc)dc.textContent=plants.filter(p=>due(p.last_watered_at,p.watering_interval_days)||due(p.last_fertilized_at,p.fertilizing_interval_days)).length;if(rc)rc.textContent=roomNames().length}
 async function load(){
   if(loading) return;
   loading=true;
@@ -377,6 +378,22 @@ $('lightStart').onclick=startLightMeter;
 $('lightSave').onclick=()=>{const p=plants.find(x=>x.id===lightPlantId);if(!p)return;const v=lightCurrent??Number($('manualLux')?.value);if(!Number.isFinite(v)||v<0){$('lightMsg').textContent='Bitte einen gültigen Lux-Wert eingeben.';return}const all=getLightReadings();all[lightPlantId]=[{lux:v,at:new Date().toISOString()},...(all[lightPlantId]||[])].slice(0,50);saveLightReadings(all);$('lightMsg').textContent='Gespeichert.';stopLightSensor();setTimeout(()=>{$('lightModal').classList.add('hidden');if(lightPlantId)window.detail(lightPlantId)},300)};
 $('lightClose').onclick=()=>{stopLightSensor();$('lightModal').classList.add('hidden')};
 
+
+/* V4.4 · Backup & Export */
+function downloadBlob(name, content, type){const blob=new Blob([content],{type});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000)}
+function csvCell(v){const x=String(v??'');return '"'+x.replace(/"/g,'""')+'"'}
+async function collectBackup(){
+  const u=(await db.auth.getUser()).data.user;
+  const [care,health,photos]=await Promise.all([
+    db.from('plant_care_logs').select('*').eq('user_id',u.id).order('performed_at',{ascending:true}),
+    db.from('plant_health_logs').select('*').eq('user_id',u.id).order('created_at',{ascending:true}),
+    db.from('plant_photos').select('*').eq('user_id',u.id).order('taken_at',{ascending:true})
+  ]);
+  return {version:'4.4',exported_at:new Date().toISOString(),user_id:u.id,plants,care_logs:care.data||[],health_logs:health.data||[],photos:photos.data||[],rooms:savedRooms(),light_readings:getLightReadings()};
+}
+$('exportBackup')?.addEventListener('click',async()=>{const b=$('backupMsg');b.textContent='Backup wird erstellt …';try{const data=await collectBackup();downloadBlob(`planty-backup-${new Date().toISOString().slice(0,10)}.json`,JSON.stringify(data,null,2),'application/json;charset=utf-8');b.textContent=`✓ Backup exportiert · ${data.plants.length} Pflanzen · ${data.care_logs.length} Pflegeeinträge · ${data.health_logs.length} Gesundheitschecks`; }catch(e){b.textContent='Backup fehlgeschlagen: '+(e?.message||e)}});
+$('exportPlantsCsv')?.addEventListener('click',()=>{const head=['ID','Name','Art','Standort','Licht','Gießintervall Tage','Letztes Gießen','Düngeintervall Tage','Letztes Düngen','Gesundheitsstatus','Notizen','Angelegt'];const rows=plants.map(p=>[p.id,p.name,p.species,p.location,p.light_level,p.watering_interval_days,p.last_watered_at,p.fertilizing_interval_days,p.last_fertilized_at,p.health_status,p.notes,p.created_at]);downloadBlob(`planty-pflanzen-${new Date().toISOString().slice(0,10)}.csv`,[head,...rows].map(r=>r.map(csvCell).join(';')).join('\n'),'text/csv;charset=utf-8');$('backupMsg').textContent=`✓ CSV exportiert · ${plants.length} Pflanzen`;});
+$('importBackup')?.addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;const b=$('backupMsg');try{const data=JSON.parse(await file.text());if(!data||!Array.isArray(data.plants)||!Array.isArray(data.care_logs)||!Array.isArray(data.health_logs)){throw new Error('Ungültiges Planty-Backup.')}if(!confirm(`Backup vom ${data.exported_at?new Date(data.exported_at).toLocaleString('de-DE'):'unbekannten Datum'} importieren? Bestehende Datensätze mit gleicher ID werden aktualisiert.`)){e.target.value='';return}const u=(await db.auth.getUser()).data.user;const ps=data.plants.map(x=>({...x,user_id:u.id}));const pr=await db.from('plants').upsert(ps,{onConflict:'id'});if(pr.error)throw pr.error;const valid=new Set(ps.map(x=>x.id));const cr=data.care_logs.filter(x=>valid.has(x.plant_id)).map(x=>({...x,user_id:u.id}));if(cr.length){const r=await db.from('plant_care_logs').upsert(cr,{onConflict:'id'});if(r.error)throw r.error}const hr=data.health_logs.filter(x=>valid.has(x.plant_id)).map(x=>({...x,user_id:u.id}));if(hr.length){const r=await db.from('plant_health_logs').upsert(hr,{onConflict:'id'});if(r.error)throw r.error}if(Array.isArray(data.rooms))saveRooms(data.rooms);if(data.light_readings&&typeof data.light_readings==='object')saveLightReadings(data.light_readings);b.textContent=`✓ Import abgeschlossen · ${ps.length} Pflanzen · ${cr.length} Pflegeeinträge · ${hr.length} Gesundheitschecks`;e.target.value='';await load()}catch(err){b.textContent='Import fehlgeschlagen: '+(err?.message||err);e.target.value=''}});
 function renderReminders(){const dueW=plants.filter(p=>due(p.last_watered_at,p.watering_interval_days)).length,dueF=plants.filter(p=>due(p.last_fertilized_at,p.fertilizing_interval_days)).length;const box=$('p25-reminder-panel');if(box)box.innerHTML=`<div class="p25-head"><div><div class="p25-title">🔔 Pflege-Erinnerungen</div><div class="p25-sub">Automatisch aus deinen Intervallen berechnet.</div></div><div class="p25-summary"><span>💧 ${dueW} fällig</span><span>🌱 ${dueF} fällig</span></div></div>`}
 
 /* V3.7 · Seiten-Navigation: vorhandene Funktionen bleiben erhalten, aber werden in klare Bereiche aufgeteilt. */
