@@ -139,6 +139,7 @@ function renderCockpit(){
 }
 window.fertilize=async id=>completeCare(id,'fert');
 function renderV45Quick(){const pc=$('p45PlantCount'),dc=$('p45DueCount'),rc=$('p45RoomCount');if(pc)pc.textContent=plants.length;if(dc)dc.textContent=plants.filter(p=>due(p.last_watered_at,p.watering_interval_days)||due(p.last_fertilized_at,p.fertilizing_interval_days)).length;if(rc)rc.textContent=roomNames().length}
+function renderV46Home(){const dueRows=careEntries().filter(x=>x.date<=new Date()).sort((a,b)=>a.date-b.date).slice(0,3);const dueCount=plants.filter(p=>due(p.last_watered_at,p.watering_interval_days)||due(p.last_fertilized_at,p.fertilizing_interval_days)).length;const healthCount=plants.filter(p=>(p.health_status||'Gut')!=='Gut').length;const rooms=roomNames().length;const actions=careHistory.length;const set=(id,v)=>{const el=$(id);if(el)el.textContent=v};set('p46Due',dueCount);set('p46Health',healthCount);set('p46Rooms',rooms);set('p46Actions',actions);const box=$('p46Next');if(!box)return;box.innerHTML=dueRows.length?'<div class="p46-next-head"><b>Als Nächstes</b><span>'+dueRows.length+' Aufgaben</span></div>'+dueRows.map(x=>`<button onclick="detail('${x.plant.id}')"><span>${x.icon}</span><div><b>${safe(x.plant.name)}</b><small>${safe(x.label)} · ${fmt(x.date)}</small></div><strong>›</strong></button>`).join(''):'<div class="p46-done">✓ Keine fälligen Aufgaben</div>'}
 async function load(){
   if(loading) return;
   loading=true;
@@ -176,7 +177,7 @@ async function load(){
       html+=`<div class="plant" data-id="${p.id}" onclick="detail('${p.id}')"><button class="fav-btn ${fav?'active':''}" onclick="event.stopPropagation();toggleFavorite('${p.id}')" aria-label="Favorit">${fav?'♥':'♡'}</button><div class="pic">${url?`<img src="${url}" alt="">`:'🌿'}</div><h3>${safe(p.name)}</h3><p>${safe(p.species||'Zimmerpflanze')} · ${safe(p.location||'Kein Standort')}</p>${due(p.last_watered_at,p.watering_interval_days)?'<span class="badge">💧 Gießen fällig</span>':''}</div>`;
     }
     $('plants').innerHTML=html+`<div class="plant addplant" onclick="openModal()">＋ Pflanze hinzufügen</div>`;
-    applyFilters(); renderReminders(); renderCockpit(); renderActions(); renderIntelligence(); renderJournal(); renderStats(); renderCalendar(); renderLocationAnalysis(); renderHealthMonitor();
+    applyFilters(); renderReminders(); renderCockpit(); renderActions(); renderIntelligence(); renderJournal(); renderStats(); renderCalendar(); renderLocationAnalysis(); renderHealthMonitor(); renderV45Quick(); renderV46Home();
   } catch(e){
     auth('Fehler beim Laden: '+(e?.message||e));
   } finally { loading=false; }
