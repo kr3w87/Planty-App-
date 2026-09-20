@@ -400,17 +400,21 @@ function renderReminders(){const dueW=plants.filter(p=>due(p.last_watered_at,p.w
 /* V3.7 · Seiten-Navigation: vorhandene Funktionen bleiben erhalten, aber werden in klare Bereiche aufgeteilt. */
 const pageButtons=[...document.querySelectorAll('.app-nav-btn')];
 const pageSections=[...document.querySelectorAll('[data-page-section]')];
+const moreNavMenu=document.getElementById('moreNavMenu');
+const moreNavBtn=document.getElementById('moreNavBtn');
+const moreNavItems=[...document.querySelectorAll('#moreNavMenu [data-page]')];
+function closeMoreNav(){ if(moreNavMenu) moreNavMenu.classList.add('hidden'); if(moreNavBtn) moreNavBtn.setAttribute('aria-expanded','false'); }
 function showPage(page,scroll=true){
-  pageButtons.forEach(b=>b.classList.toggle('active',b.dataset.page===page));
-  pageSections.forEach(el=>el.classList.toggle('page-section-hidden',el.dataset.pageSection!==page));
-  if(page==='plants'){setTimeout(()=>{if(typeof applyFilters==='function')applyFilters()},0)}
-  if(page==='calendar'){setTimeout(()=>{if(typeof renderCalendar==='function')renderCalendar()},0)}
-  if(page==='journal'){setTimeout(()=>{if(typeof renderJournal==='function')renderJournal()},0)}
-  if(page==='stats'){setTimeout(()=>{if(typeof renderStats==='function')renderStats()},0)}
-  if(page==='rooms'){setTimeout(()=>{if(typeof renderRooms==='function')renderRooms()},0)}
-  if(scroll)window.scrollTo({top:0,behavior:'smooth'});
+ pageSections.forEach(s=>s.classList.toggle('hidden',s.dataset.pageSection!==page));
+ pageButtons.forEach(b=>b.classList.toggle('active',b.dataset.page===page));
+ moreNavItems.forEach(b=>b.classList.toggle('active',b.dataset.page===page));
+ closeMoreNav();
+ if(scroll) window.scrollTo({top:0,behavior:'smooth'});
 }
-pageButtons.forEach(b=>b.addEventListener('click',()=>showPage(b.dataset.page)));
+pageButtons.filter(b=>b!==moreNavBtn).forEach(b=>b.addEventListener('click',()=>showPage(b.dataset.page)));
+moreNavItems.forEach(b=>b.addEventListener('click',()=>showPage(b.dataset.page)));
+moreNavBtn?.addEventListener('click',e=>{e.stopPropagation(); const open=!moreNavMenu.classList.contains('hidden'); moreNavMenu.classList.toggle('hidden',open); moreNavBtn.setAttribute('aria-expanded',String(!open));});
+document.addEventListener('click',e=>{if(moreNavMenu&&!moreNavMenu.contains(e.target)&&e.target!==moreNavBtn) closeMoreNav();});
 showPage('home',false);
 
 $('logout').onclick=async()=>{await db.auth.signOut();auth();};
