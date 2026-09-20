@@ -213,3 +213,6 @@ main{padding:18px 20px 44px}.page-section-title{padding:14px 2px 4px}.eyebrow{co
 .home-optional{display:none!important}
 #todayFocus,.p45-start{margin-bottom:10px}
 @media(max-width:560px){.p46-home-dashboard{padding:13px;border-radius:18px}.p46-title h2{font-size:18px}.p46-title button{font-size:9px}.p46-metrics{grid-template-columns:repeat(2,1fr)}.p46-links{grid-template-columns:repeat(2,1fr)}main{padding-bottom:28px}}
+
+/* V4.7 – Mobile navigation darf keine Aktionen verdecken */
+@media(max-width:700px){main{padding-bottom:110px}.app-nav{z-index:50}.modal{z-index:100}.addplant{scroll-margin-bottom:110px}}
