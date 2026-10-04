@@ -82,7 +82,10 @@ async function session(){
     const r=await db.auth.getSession();
     if(r.error){ auth('Supabase-Sitzung konnte nicht geladen werden: '+r.error.message); return; }
     authReady=true;
-    if(r.data?.session) await load(); else auth();
+    if(r.data?.session){
+      window.plantyUserId=r.data.session.user.id;
+      await load();
+    } else auth();
   } catch(e){ auth('Verbindungsfehler: '+(e?.message||e)); }
 }
 $('mode').onclick=()=>{signup=!signup;$('title').textContent=signup?'Konto erstellen':'Willkommen zurück';$('authBtn').textContent=signup?'REGISTRIEREN':'ANMELDEN';$('mode').textContent=signup?'Schon registriert? Anmelden':'Noch kein Konto? Registrieren'};
@@ -95,6 +98,7 @@ $('authForm').onsubmit=async e=>{
     if(r.error){ $('authMsg').textContent=r.error.message; return; }
     if(signup && !r.data?.session){ $('authMsg').textContent='Konto erstellt. Bitte prüfe deine E-Mail.'; return; }
     $('authMsg').textContent='';
+    window.plantyUserId=r.data?.user?.id || r.data?.session?.user?.id || null;
     await load();
   } catch(e){ $('authMsg').textContent='Anmeldung fehlgeschlagen: '+(e?.message||e); }
   finally { $('authBtn').disabled=false; }
