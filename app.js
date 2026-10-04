@@ -80,13 +80,20 @@ function auth(msg=''){ $('auth').classList.remove('hidden'); $('app').classList.
 async function session(){
   try {
     const r=await db.auth.getSession();
-    if(r.error){ auth('Supabase-Sitzung konnte nicht geladen werden: '+r.error.message); return; }
     authReady=true;
+    if(r.error){
+      console.warn('Supabase getSession:',r.error);
+      auth('Supabase ist momentan nicht erreichbar. Bitte prüfe Internetverbindung und Supabase-Projekt.');
+      return;
+    }
     if(r.data?.session){
       window.plantyUserId=r.data.session.user.id;
       await load();
     } else auth();
-  } catch(e){ auth('Verbindungsfehler: '+(e?.message||e)); }
+  } catch(e){
+    console.error('Supabase session error:',e);
+    auth('Supabase ist momentan nicht erreichbar. Bitte Seite neu laden oder Verbindung prüfen.');
+  }
 }
 $('mode').onclick=()=>{signup=!signup;$('title').textContent=signup?'Konto erstellen':'Willkommen zurück';$('authBtn').textContent=signup?'REGISTRIEREN':'ANMELDEN';$('mode').textContent=signup?'Schon registriert? Anmelden':'Noch kein Konto? Registrieren'};
 $('authForm').onsubmit=async e=>{
@@ -100,8 +107,13 @@ $('authForm').onsubmit=async e=>{
     $('authMsg').textContent='';
     window.plantyUserId=r.data?.user?.id || r.data?.session?.user?.id || null;
     await load();
-  } catch(e){ $('authMsg').textContent='Anmeldung fehlgeschlagen: '+(e?.message||e); }
-  finally { $('authBtn').disabled=false; }
+  } catch(e){
+    console.error('Supabase login error:',e);
+    const msg=String(e?.message||e||'');
+    $('authMsg').textContent=msg.toLowerCase().includes('failed to fetch')
+      ? 'Supabase ist nicht erreichbar (Failed to fetch). Bitte Internetverbindung und Supabase-Projekt prüfen.'
+      : 'Anmeldung fehlgeschlagen: '+msg;
+  } finally { $('authBtn').disabled=false; }
 };
 async function signed(path){const r=await db.storage.from('plant-photos').createSignedUrl(path,3600);return r.data?.signedUrl||''}
 async function photosFor(id){const r=await db.from('plant_photos').select('*').eq('plant_id',id).order('taken_at',{ascending:false});return r.data||[]}
