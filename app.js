@@ -137,8 +137,61 @@ function renderActions(){
   const entries=actionEntries();
   list.innerHTML=entries.length?entries.map(x=>{const state=careState(x.date);return `<div class="p29-action ${state}"><div class="p29-action-main"><span class="p29-icon">${x.icon}</span><div><b>${safe(x.plant.name)} · ${x.label}</b><small>${state==='overdue'?'Überfällig seit '+fmt(x.date):state==='today'?'Heute fällig':'Fällig am '+fmt(x.date)}</small></div></div><div class="p29-buttons"><button class="primary-action" onclick="completeCare('${x.plant.id}','${x.type}')">✓ Erledigt</button><button onclick="skipCare('${x.plant.id}','${x.type}')">Überspringen</button></div></div>`}).join(''):'<div class="p29-empty">🎉 Keine offenen Pflegeaktionen. Deine Pflanzen sind im Plan.</div>';
 }
-window.completeCare=async(id,type)=>{const p=plants.find(x=>x.id===id);if(!p)return;const field=type==='water'?'last_watered_at':'last_fertilized_at',now=new Date().toISOString();const r=await db.from('plants').update({[field]:now}).eq('id',id);if(r.error){alert(r.error.message);return}await logCare(id,type);await load()};
-window.skipCare=async(id,type)=>{const p=plants.find(x=>x.id===id);if(!p)return;const interval=type==='water'?p.watering_interval_days:p.fertilizing_interval_days;const field=type==='water'?'last_watered_at':'last_fertilized_at';const base=actionDate(p,type)||new Date();const next=new Date(base);next.setDate(next.getDate()+Number(interval||7));const r=await db.from('plants').update({[field]:next.toISOString()}).eq('id',id);if(r.error){alert(r.error.message);return}await logCare(id,'skip',`Neuer Termin ${fmt(next)}`);await load()};
+const pendingCareKey=()=>`planty:pending-care:${window.plantyUserId||'user'}`;
+function getPendingCare(){try{return JSON.parse(localStorage.getItem(pendingCareKey())||'[]')}catch{return[]}}
+function savePendingCare(rows){localStorage.setItem(pendingCareKey(),JSON.stringify(rows))}
+async function flushPendingCare(){
+  const rows=getPendingCare();if(!rows.length||!window.plantyUserId)return;
+  const remaining=[];
+  for(const x of rows){
+    try{
+      const field=x.field||(x.type==='water'?'last_watered_at':'last_fertilized_at');
+      const up=await db.from('plants').update({[field]:x.when}).eq('id',x.plant_id).eq('user_id',window.plantyUserId);
+      if(up.error)throw up.error;
+      const log=await db.from('plant_care_logs').upsert({id:x.log_id,plant_id:x.plant_id,user_id:window.plantyUserId,type:x.type,performed_at:x.when,note:x.note||null},{onConflict:'id'});
+      if(log.error)throw log.error;
+    }catch(e){remaining.push(x);console.warn('Pflegeaktion wartet auf Synchronisierung:',e?.message||e)}
+  }
+  savePendingCare(remaining);
+}
+function renderCareAfterLocalChange(){
+  const set=(id,v)=>{const el=$(id);if(el)el.textContent=v};
+  set('water',plants.filter(p=>due(p.last_watered_at,p.watering_interval_days)).length);
+  set('fert',plants.filter(p=>due(p.last_fertilized_at,p.fertilizing_interval_days)).length);
+  renderActions();renderCockpit();renderJournal();renderStats();renderCalendar();renderV46Home();
+  const tasks=plants.filter(p=>due(p.last_watered_at,p.watering_interval_days)).map(p=>`<div class="task">💧 <span><b>${safe(p.name)}</b><br><small>Gießen</small></span><button onclick="water('${p.id}')">Gegossen ✓</button></div>`);
+  if($('tasks'))$('tasks').innerHTML=tasks.length?tasks.slice(0,8).join(''):'<div class="task">♡ Heute ist alles erledigt</div>';
+}
+async function recordCareAction(id,type,note=null){
+  const p=plants.find(x=>x.id===id);if(!p)return;
+  const when=new Date().toISOString(),field=type==='water'?'last_watered_at':'last_fertilized_at';
+  const logId=crypto.randomUUID(),entry={plant_id:id,user_id:window.plantyUserId,type,performed_at:when,note};
+  const pending=getPendingCare();pending.push({plant_id:id,type,when,note,log_id:logId});savePendingCare(pending);
+  p[field]=when;
+  addJournal({plant_id:id,type,label:type==='water'?'Gießen erledigt':type==='fert'?'Düngen erledigt':'Pflegeaktion',note,created_at:when});
+  renderCareAfterLocalChange();
+  await flushPendingCare();
+  const left=getPendingCare().some(x=>x.log_id===logId);
+  if(left){alert('Die Aktion ist auf diesem Gerät vorgemerkt, konnte aber noch nicht mit Supabase synchronisiert werden. Prüfe die Verbindung; Planty versucht es später erneut.');}
+  else await load();
+}
+window.completeCare=async(id,type)=>{
+  const p=plants.find(x=>x.id===id);if(!p)return;
+  const buttons=[...document.querySelectorAll(`button[onclick*="${id}"]`)].filter(b=>/Gegossen|Erledigt|Gedüngt/.test(b.textContent));
+  buttons.forEach(b=>{b.disabled=true;b.dataset.oldText=b.textContent;b.textContent='Speichere…'});
+  try{await recordCareAction(id,type)}catch(e){console.error('Pflegeaktion fehlgeschlagen:',e);alert('Pflegeaktion konnte nicht verarbeitet werden: '+(e?.message||e))}
+  finally{buttons.forEach(b=>{b.disabled=false;if(b.dataset.oldText){b.textContent=b.dataset.oldText;delete b.dataset.oldText}})}
+};
+window.skipCare=async(id,type)=>{
+  const p=plants.find(x=>x.id===id);if(!p)return;
+  const interval=type==='water'?p.watering_interval_days:p.fertilizing_interval_days;
+  const field=type==='water'?'last_watered_at':'last_fertilized_at';
+  const base=actionDate(p,type)||new Date(),next=new Date(base);next.setDate(next.getDate()+Number(interval||7));
+  const when=next.toISOString(),logId=crypto.randomUUID(),note=`Neuer Termin ${fmt(next)}`;
+  const pending=getPendingCare();pending.push({plant_id:id,type:'skip',when,note,log_id:logId,field});savePendingCare(pending);
+  p[field]=when;addJournal({plant_id:id,type:'skip',label:'Pflegeaktion',note,created_at:new Date().toISOString()});renderCareAfterLocalChange();
+  try{await flushPendingCare();if(getPendingCare().some(x=>x.log_id===logId))alert('Der neue Termin ist lokal vorgemerkt und wird synchronisiert, sobald Supabase erreichbar ist.');else await load()}catch(e){alert('Termin lokal vorgemerkt; Synchronisierung fehlgeschlagen: '+(e?.message||e))}
+};
 function renderCockpit(){
   const entries=careEntries(), overdue=entries.filter(x=>careState(x.date)==='overdue'), today=entries.filter(x=>careState(x.date)==='today');
   const weekEnd=new Date();weekEnd.setDate(weekEnd.getDate()+7);const week=entries.filter(x=>x.date<=weekEnd);
@@ -167,6 +220,8 @@ async function load(){
     const r=await db.from('plants').select('*').order('created_at',{ascending:false});
     if(r.error){ auth('Datenbankfehler: '+r.error.message); return; }
     plants=r.data||[];
+    const localPending=getPendingCare();for(const x of localPending){const p=plants.find(y=>y.id===x.plant_id);if(p)p[x.field||(x.type==='water'?'last_watered_at':'last_fertilized_at')]=x.when;}
+    flushPendingCare().catch(e=>console.warn('Pflegeaktionen noch nicht synchronisiert:',e));
     const healthRows=await db.from('plant_health_logs').select('*').order('created_at',{ascending:false});
     careHealthRows=healthRows.data||[];
     await migrateLocalJournal();
